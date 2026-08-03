@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PaperStreak — Ciencia real, todos los días</title>
+<meta name="description" content="PaperStreak: forma el hábito de leer ciencia real todos los días con recomendaciones diarias de papers de acceso abierto.">
+<meta name="theme-color" content="#c1440e">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="styles.css">
+<!--
+  Google Identity Services (Sign In With Google).
+  Configura tu Client ID en config.js antes de desplegar.
+  No requiere backend: el ID token se decodifica en el cliente
+  solo para mostrar nombre/avatar y separar perfiles locales.
+-->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="config.js"></script>
+</head>
+<body>
+<a href="#view" class="skip-link">Saltar al contenido</a>
+<div id="app-shell">
+  <header class="topbar" id="topbar"></header>
+  <main id="view" tabindex="-1"></main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

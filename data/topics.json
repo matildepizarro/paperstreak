@@ -1,0 +1,18 @@
+[
+  { "id": "voice-speech", "label": "Voz y lenguaje", "sub": ["voz", "prosodia", "trastornos del habla", "acústica vocal"] },
+  { "id": "speech-therapy", "label": "Fonoaudiología", "sub": ["terapia del habla", "deglución", "audiología clínica"] },
+  { "id": "medicine", "label": "Medicina", "sub": ["medicina interna", "diagnóstico", "ensayos clínicos"] },
+  { "id": "neuroscience", "label": "Neurociencia", "sub": ["neuroimagen", "plasticidad cerebral", "neurodegeneración"] },
+  { "id": "public-health", "label": "Salud pública", "sub": ["epidemiología", "políticas de salud", "prevención"] },
+  { "id": "psychology", "label": "Psicología", "sub": ["cognición", "psicología clínica", "desarrollo"] },
+  { "id": "ai", "label": "Inteligencia artificial", "sub": ["aprendizaje profundo", "NLP", "modelos generativos"] },
+  { "id": "biology", "label": "Biología", "sub": ["biología molecular", "genética", "evolución"] },
+  { "id": "music", "label": "Música", "sub": ["cognición musical", "acústica musical", "terapia musical"] },
+  { "id": "education", "label": "Educación", "sub": ["aprendizaje", "tecnología educativa", "pedagogía"] },
+  { "id": "social-science", "label": "Ciencias sociales", "sub": ["sociología", "antropología", "economía conductual"] },
+  { "id": "engineering", "label": "Ingeniería", "sub": ["biomédica", "software", "señales"] },
+  { "id": "bioinformatics", "label": "Bioinformática", "sub": ["genómica computacional", "estructura de proteínas"] },
+  { "id": "clinical", "label": "Clínica", "sub": ["diagnóstico clínico", "tratamiento", "casos clínicos"] },
+  { "id": "rehabilitation", "label": "Rehabilitación", "sub": ["rehabilitación motora", "rehabilitación cognitiva", "terapia ocupacional"] },
+  { "id": "other", "label": "Otras", "sub": ["divulgación", "interdisciplinar"] }
+]

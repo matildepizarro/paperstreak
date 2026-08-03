@@ -1,0 +1,13 @@
+{
+  "name": "PaperStreak",
+  "short_name": "PaperStreak",
+  "description": "Ciencia real, todos los días. Tu hábito diario de lectura científica.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#faf7f2",
+  "theme_color": "#c1440e",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

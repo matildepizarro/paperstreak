@@ -1,0 +1,36 @@
+{
+  "onboardingCompleted": true,
+  "interests": {
+    "mainTopics": ["voice-speech", "speech-therapy", "neuroscience"],
+    "subTopics": ["trastornos del habla", "plasticidad cerebral"],
+    "excludedTopics": ["social-science"],
+    "favoriteAuthors": [],
+    "favoriteJournals": ["Europe PMC"],
+    "language": "es",
+    "preferredPaperTypes": ["estudio original", "review"],
+    "readingLevel": "intermedio"
+  },
+  "readingFormat": {
+    "dailyMinutes": 12,
+    "depth": "resumen extendido",
+    "lengthPreference": "mediano"
+  },
+  "feedStyle": "destacado",
+  "stats": {
+    "xp": 0,
+    "level": 1,
+    "currentStreak": 0,
+    "maxStreak": 0,
+    "papersRead": [],
+    "papersSaved": [],
+    "papersSeen": [],
+    "papersPostponed": [],
+    "topicMastery": {},
+    "weeklyHistory": [],
+    "achievements": [],
+    "lastAccessDate": null
+  },
+  "settings": {
+    "theme": "light"
+  }
+}
