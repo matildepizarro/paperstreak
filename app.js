@@ -89,7 +89,11 @@ let currentRoute = "home";
 let currentReadingPaper = null;
 let readerNotesDraft = "";
 
-function persist() { Store.save(PROFILE); }
+function persist() {
+  PROFILE.updatedAt = Date.now();
+  Store.save(PROFILE);
+  if (typeof Auth !== "undefined") Auth.queueCloudSync(PROFILE);
+}
 
 /* ---------------------------------------------------------
    Utilidades de fecha
@@ -931,6 +935,7 @@ function attachSettingsEvents() {
       try {
         Store.importData(reader.result);
         PROFILE = Store.load();
+        if (typeof Auth !== "undefined") Auth.queueCloudSync(PROFILE);
         showToast("Datos importados correctamente");
         render();
       } catch (err) {
@@ -962,6 +967,7 @@ function attachSettingsEvents() {
       Store.reset();
       PROFILE = Store.load();
       Onboarding.reset();
+      if (typeof Auth !== "undefined") Auth.queueCloudSync(PROFILE); // también borra el progreso en la nube
       render();
     }
   });

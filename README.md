@@ -30,6 +30,39 @@ resultado en caché local por 12 horas. Cada tarjeta enlaza a la página real de
 artículo en Europe PMC (o a su DOI), así que nunca debería llevar a una fuente
 inexistente.
 
+## Progreso sincronizado entre dispositivos (Firestore)
+
+El progreso (racha, XP, papers leídos, notas) ya no vive solo en el navegador:
+cada usuario de Google tiene un documento propio en Cloud Firestore
+(`profiles/{uid}`). `auth.js` lo guarda ahí en cada cambio (con un pequeño
+debounce) y escucha cambios en tiempo real, así que si lees un paper en el
+celular y luego abres PaperStreak en la computadora, ves la racha actualizada.
+localStorage sigue existiendo como caché rápida y para funcionar offline.
+
+**Paso obligatorio en la consola de Firebase para que esto funcione:**
+
+1. Ve a **Build → Firestore Database → Crear base de datos**. Elige modo
+   "producción" y la región que prefieras.
+2. En la pestaña **Reglas**, reemplaza el contenido por esto, para que cada
+   persona solo pueda leer/escribir su propio perfil:
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /profiles/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+```
+
+3. Clic en **"Publicar"**.
+
+Sin este paso, Firestore rechaza todas las lecturas/escrituras por defecto (modo
+producción) y el progreso no se sincronizará — la app seguirá funcionando con la
+copia local del navegador como respaldo.
+
 ## Lectura del texto completo, no resúmenes
 
 El lector (`renderReader`) ya no reescribe el abstract como "resumen breve" ni
