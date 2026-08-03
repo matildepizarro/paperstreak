@@ -3,108 +3,8 @@
    Todo el estado vive en localStorage. Sin backend.
    ========================================================= */
 
-const STORAGE_PREFIX = "paperstreak:profile:v1";
-const AUTH_KEY = "paperstreak:auth:v1";
+let STORAGE_KEY = "paperstreak:profile:v1"; // Auth.js lo namespacea por uid tras el login con Google
 const THEME_KEY = "paperstreak:theme";
-
-/* ---------------------------------------------------------
-   Autenticación con Google (Google Identity Services)
-   No hay backend: el ID token se decodifica en el cliente solo
-   para leer nombre/correo/foto y así separar perfiles locales
-   por cuenta en el mismo navegador. Esto NO es una verificación
-   criptográfica segura de identidad (no hay servidor que la
-   valide); para eso haría falta un backend que verifique la
-   firma del token contra Google.
-   --------------------------------------------------------- */
-const Auth = {
-  current: null, // { sub, name, email, picture } | null (null = invitado)
-
-  load() {
-    try {
-      const raw = localStorage.getItem(AUTH_KEY);
-      this.current = raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      this.current = null;
-    }
-    return this.current;
-  },
-
-  persist() {
-    if (this.current) localStorage.setItem(AUTH_KEY, JSON.stringify(this.current));
-    else localStorage.removeItem(AUTH_KEY);
-  },
-
-  decodeJwt(token) {
-    try {
-      const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-      const json = decodeURIComponent(
-        atob(base64).split("").map(c => "%" + c.charCodeAt(0).toString(16).padStart(2, "0")).join("")
-      );
-      return JSON.parse(json);
-    } catch (e) {
-      console.error("No se pudo decodificar el token de Google", e);
-      return null;
-    }
-  },
-
-  handleCredentialResponse(response) {
-    const payload = this.decodeJwt(response.credential);
-    if (!payload) return;
-    this.current = {
-      sub: payload.sub,
-      name: payload.name || payload.email,
-      email: payload.email,
-      picture: payload.picture || "",
-    };
-    this.persist();
-    onAuthChanged();
-  },
-
-  loginAsGuest() {
-    this.current = { sub: "guest", name: "Invitado", email: "", picture: "", isGuest: true };
-    this.persist();
-    onAuthChanged();
-  },
-
-  logout() {
-    this.current = null;
-    this.persist();
-    if (window.google && google.accounts && google.accounts.id) {
-      google.accounts.id.disableAutoSelect();
-    }
-    onAuthChanged();
-  },
-
-  storageKey() {
-    const id = this.current ? this.current.sub : "guest";
-    return `${STORAGE_PREFIX}:${id}`;
-  },
-
-  isReady() {
-    return !!(window.PAPERSTREAK_CONFIG && window.PAPERSTREAK_CONFIG.GOOGLE_CLIENT_ID &&
-      !window.PAPERSTREAK_CONFIG.GOOGLE_CLIENT_ID.startsWith("TU_"));
-  },
-
-  initGis() {
-    if (!this.isReady() || !window.google || !google.accounts || !google.accounts.id) return;
-    google.accounts.id.initialize({
-      client_id: window.PAPERSTREAK_CONFIG.GOOGLE_CLIENT_ID,
-      callback: (resp) => this.handleCredentialResponse(resp),
-      auto_select: false,
-    });
-  },
-
-  renderButton(elId) {
-    if (!this.isReady() || !window.google || !google.accounts || !google.accounts.id) return false;
-    const el = document.getElementById(elId);
-    if (!el) return false;
-    google.accounts.id.renderButton(el, {
-      type: "standard", theme: "outline", size: "large", text: "signin_with",
-      shape: "pill", logo_alignment: "left", width: 280,
-    });
-    return true;
-  },
-};
 
 const ACHIEVEMENTS = [
   { id: "streak3", name: "3 días seguidos", emoji: "🔥", check: s => s.currentStreak >= 3 },
@@ -148,7 +48,7 @@ const Store = {
   },
   load() {
     try {
-      const raw = localStorage.getItem(Auth.storageKey());
+      const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return this.defaultProfile();
       const parsed = JSON.parse(raw);
       return Object.assign(this.defaultProfile(), parsed);
@@ -158,13 +58,13 @@ const Store = {
     }
   },
   save(profile) {
-    localStorage.setItem(Auth.storageKey(), JSON.stringify(profile));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
   },
   reset() {
-    localStorage.removeItem(Auth.storageKey());
+    localStorage.removeItem(STORAGE_KEY);
   },
   exportData() {
-    const data = localStorage.getItem(Auth.storageKey()) || "{}";
+    const data = localStorage.getItem(STORAGE_KEY) || "{}";
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -175,26 +75,19 @@ const Store = {
   },
   importData(jsonText) {
     const parsed = JSON.parse(jsonText);
-    localStorage.setItem(Auth.storageKey(), JSON.stringify(parsed));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
   },
 };
 
 /* ---------------------------------------------------------
    Estado global de la app
    --------------------------------------------------------- */
-Auth.load();
 let PROFILE = Store.load();
 let PAPERS = [];
 let TOPICS = [];
 let currentRoute = "home";
 let currentReadingPaper = null;
 let readerNotesDraft = "";
-
-function onAuthChanged() {
-  PROFILE = Store.load();
-  currentRoute = "home";
-  render();
-}
 
 function persist() { Store.save(PROFILE); }
 
@@ -422,12 +315,21 @@ const Gamification = {
    Carga de datos
    --------------------------------------------------------- */
 async function loadData() {
-  const [papersRes, topicsRes] = await Promise.all([
-    fetch("data/papers.json"),
-    fetch("data/topics.json"),
-  ]);
-  PAPERS = await papersRes.json();
+  const topicsRes = await fetch("data/topics.json");
   TOPICS = await topicsRes.json();
+  await refreshCatalog();
+}
+
+// Trae papers reales y abiertos desde Europe PMC para los temas de interés
+// del usuario (o los 3 primeros temas si aún no eligió ninguno).
+async function refreshCatalog() {
+  const mainTopics = (PROFILE.interests && PROFILE.interests.mainTopics) || [];
+  try {
+    PAPERS = await EuropePMC.buildCatalog(TOPICS, mainTopics);
+  } catch (e) {
+    console.error("No se pudo cargar el catálogo de Europe PMC", e);
+    PAPERS = [];
+  }
 }
 
 function topicLabel(id) {
@@ -518,18 +420,9 @@ function showToast(msg) {
    --------------------------------------------------------- */
 function render() {
   document.documentElement.setAttribute("data-theme", PROFILE.settings.theme);
-
-  const view = document.getElementById("view");
-
-  if (!Auth.current) {
-    document.getElementById("topbar").innerHTML = "";
-    view.innerHTML = renderLoginGate();
-    attachLoginGateEvents();
-    return;
-  }
-
   renderTopbar();
 
+  const view = document.getElementById("view");
   if (!PROFILE.onboardingCompleted) {
     view.innerHTML = "";
     Onboarding.mount();
@@ -552,10 +445,6 @@ function render() {
 function renderTopbar() {
   const bar = document.getElementById("topbar");
   if (!PROFILE.onboardingCompleted) { bar.innerHTML = ""; return; }
-  const user = Auth.current;
-  const avatar = user && user.picture
-    ? `<img src="${user.picture}" alt="" style="width:30px;height:30px;border-radius:50%;object-fit:cover;">`
-    : `<div class="icon-btn" style="width:30px;height:30px;font-size:0.8rem;">${(user && user.name ? user.name[0] : "?").toUpperCase()}</div>`;
   bar.innerHTML = `
     <div class="brand"><span class="dot"></span> PaperStreak</div>
     <nav class="nav-tabs" aria-label="Navegación principal">
@@ -568,7 +457,6 @@ function renderTopbar() {
       <div class="streak-pill" title="Racha actual">🔥 ${PROFILE.stats.currentStreak}</div>
       <div class="streak-pill" title="XP">⭐ ${PROFILE.stats.xp}</div>
       <button class="icon-btn" id="theme-toggle" aria-label="Cambiar tema">${PROFILE.settings.theme === "light" ? "🌙" : "☀️"}</button>
-      <button class="icon-btn" id="user-menu-btn" title="${user ? (user.isGuest ? "Invitado" : user.name) : ""}" aria-label="Cuenta">${avatar}</button>
     </div>
   `;
   bar.querySelectorAll("[data-route]").forEach(btn => {
@@ -579,40 +467,6 @@ function renderTopbar() {
     persist();
     render();
   });
-  document.getElementById("user-menu-btn").addEventListener("click", () => navigate("settings"));
-}
-
-/* ---------- Pantalla de login ---------- */
-function renderLoginGate() {
-  const googleReady = Auth.isReady();
-  return `
-    <div class="container" style="max-width:420px; padding-top:14vh;">
-      <div class="hero-header" style="text-align:center;">
-        <div class="brand" style="justify-content:center; font-size:1.5rem; margin-bottom:8px;"><span class="dot"></span> PaperStreak</div>
-        <p>Inicia sesión para guardar tu racha y tu progreso en este navegador.</p>
-      </div>
-      <div style="display:flex; flex-direction:column; align-items:center; gap:16px; margin-top:24px;">
-        <div id="google-signin-btn"></div>
-        ${!googleReady ? `
-          <p style="font-size:0.8rem; color:var(--text-muted); text-align:center;">
-            El botón de Google aún no está configurado (falta el Client ID en <code>config.js</code>).
-            Mientras tanto puedes continuar como invitado.
-          </p>
-        ` : ""}
-        <button class="btn btn-ghost" id="guest-login-btn">Continuar sin cuenta</button>
-      </div>
-    </div>
-  `;
-}
-
-function attachLoginGateEvents() {
-  Auth.initGis();
-  const rendered = Auth.renderButton("google-signin-btn");
-  if (!rendered) {
-    const el = document.getElementById("google-signin-btn");
-    if (el) el.innerHTML = `<button class="btn btn-primary" disabled>Iniciar sesión con Google</button>`;
-  }
-  document.getElementById("guest-login-btn").addEventListener("click", () => Auth.loginAsGuest());
 }
 
 /* ---------- Home / Feed ---------- */
@@ -722,8 +576,6 @@ function openReader(id) {
 function renderReader() {
   const paper = paperById(currentReadingPaper || (PROFILE.currentFeed && PROFILE.currentFeed.mainId));
   if (!paper) return `<div class="container"><p>No se encontró el paper.</p></div>`;
-  const keyPoints = generateKeyPoints(paper);
-  const terms = generateTerms(paper);
   const isRead = PROFILE.stats.papersRead.includes(paper.id);
 
   return `
@@ -732,33 +584,22 @@ function renderReader() {
       <div class="reader-header" style="margin-top:16px;">
         <h1 class="reader-title">${paper.title}</h1>
         <div class="reader-meta">${paper.authors.join(", ")} · ${paper.journal} · ${paper.year} · ${paper.estimatedMinutes} min · ${capitalize(paper.difficulty)}</div>
-      </div>
-
-      <div class="reader-toggle" role="tablist">
-        <button class="active" data-mode="rapida">Lectura rápida</button>
-        <button data-mode="profunda">Lectura profunda</button>
+        <div class="reader-meta">
+          <a href="${paper.openAccessUrl}" target="_blank" rel="noopener">Ver en Europe PMC ↗</a>
+          ${paper.doi ? ` · <a href="https://doi.org/${paper.doi}" target="_blank" rel="noopener">DOI: ${paper.doi} ↗</a>` : ""}
+        </div>
       </div>
 
       <details class="reader-block" open>
-        <summary>Resumen breve en lenguaje claro</summary>
-        <p>${paper.abstract}</p>
+        <summary>Abstract</summary>
+        <p>${escapeHtml(paper.abstract)}</p>
       </details>
 
-      <details class="reader-block" id="deep-abstract" style="display:none;">
-        <summary>Abstract original</summary>
-        <p>${paper.abstract}</p>
-      </details>
-
-      <details class="reader-block" open>
-        <summary>Puntos clave</summary>
-        <ul class="key-points">${keyPoints.map(k => `<li>${k}</li>`).join("")}</ul>
-      </details>
-
-      <details class="reader-block" id="deep-terms" style="display:none;">
-        <summary>Términos difíciles</summary>
-        <dl class="terms-list">
-          ${terms.map(t => `<dt>${t.term}</dt><dd>${t.def}</dd>`).join("")}
-        </dl>
+      <details class="reader-block" open id="fulltext-block">
+        <summary>Texto completo</summary>
+        <div id="fulltext-content" class="fulltext-content">
+          <p class="fulltext-status">Cargando texto completo desde Europe PMC…</p>
+        </div>
       </details>
 
       <details class="reader-block">
@@ -769,28 +610,34 @@ function renderReader() {
       <div class="reader-actions">
         <button class="btn btn-primary" id="mark-read">${isRead ? "Ya marcado como leído ✓" : "Marcar como leído"}</button>
         <button class="btn btn-secondary" id="go-quiz">Responder preguntas</button>
-        <a class="btn btn-ghost" href="${paper.pdfUrl}" target="_blank" rel="noopener">Abrir original ↗</a>
+        <a class="btn btn-ghost" href="${paper.pdfUrl || paper.openAccessUrl}" target="_blank" rel="noopener">Abrir PDF original ↗</a>
         <button class="btn btn-ghost" id="save-notes">Guardar notas</button>
       </div>
     </div>
   `;
 }
 
+// Trae el texto completo real desde Europe PMC (no un resumen) y lo
+// inserta en el lector. Si Europe PMC no tiene el texto completo
+// disponible para este artículo, se lo dice claramente al usuario
+// y deja el enlace directo a la fuente original.
+async function loadFullTextInto(paper) {
+  const el = document.getElementById("fulltext-content");
+  if (!el) return;
+  const html = await EuropePMC.fetchFullText(paper);
+  if (html) {
+    el.innerHTML = html;
+  } else {
+    el.innerHTML = `
+      <p class="fulltext-status">Europe PMC no tiene el texto completo indexado para este artículo (o su editor no lo distribuye vía la API).</p>
+      <p><a class="btn btn-secondary btn-sm" href="${paper.openAccessUrl}" target="_blank" rel="noopener">Leer el texto completo en la fuente original ↗</a></p>
+    `;
+  }
+}
+
 function attachReaderEvents() {
   const paper = paperById(currentReadingPaper || (PROFILE.currentFeed && PROFILE.currentFeed.mainId));
-  document.querySelectorAll(".reader-toggle button").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".reader-toggle button").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      const deep = btn.dataset.mode === "profunda";
-      document.getElementById("deep-abstract").style.display = deep ? "block" : "none";
-      document.getElementById("deep-terms").style.display = deep ? "block" : "none";
-      if (deep) {
-        document.getElementById("deep-abstract").open = true;
-        document.getElementById("deep-terms").open = true;
-      }
-    });
-  });
+  loadFullTextInto(paper);
   document.getElementById("mark-read").addEventListener("click", () => {
     if (!PROFILE.stats.papersRead.includes(paper.id)) {
       Gamification.markPaperRead(PROFILE, paper);
@@ -808,23 +655,6 @@ function attachReaderEvents() {
     persist();
     showToast("Notas guardadas");
   });
-}
-
-function generateKeyPoints(paper) {
-  return [
-    `Aborda ${paper.title.toLowerCase()} desde un enfoque de tipo ${paper.paperType}.`,
-    `Publicado en ${paper.journal} (${paper.year}), con acceso abierto verificado.`,
-    `Relevante para: ${paper.topics.map(topicLabel).join(", ")}.`,
-    paper.whyItMatters,
-  ];
-}
-
-function generateTerms(paper) {
-  const generic = [
-    { term: "Acceso abierto", def: "Publicación disponible de forma gratuita y legal para cualquier lector." },
-    { term: paper.paperType, def: `Tipo de artículo: ${paper.paperType}, con implicancias distintas en el nivel de evidencia.` },
-  ];
-  return generic;
 }
 
 /* ---------- Quiz ---------- */
@@ -1025,18 +855,9 @@ function renderStats() {
 
 /* ---------- Settings ---------- */
 function renderSettings() {
-  const user = Auth.current;
   return `
     <div class="container">
       <div class="hero-header"><h1>Ajustes</h1><p>Gestiona tu perfil y tus datos</p></div>
-
-      <div class="settings-group">
-        <h3>Cuenta</h3>
-        <div class="settings-row">
-          <span>${user && user.isGuest ? "Estás como invitado (datos solo en este navegador)" : `Sesión iniciada como <b>${user ? user.name : ""}</b>${user && user.email ? ` (${user.email})` : ""}`}</span>
-          <button class="btn btn-ghost btn-sm" id="logout-btn">Cerrar sesión</button>
-        </div>
-      </div>
 
       <div class="settings-group">
         <h3>Intereses principales</h3>
@@ -1065,6 +886,8 @@ function renderSettings() {
         <h3>Datos</h3>
         <div class="settings-row"><span>Exportar mis datos</span><button class="btn btn-secondary btn-sm" id="export-btn">Exportar JSON</button></div>
         <div class="settings-row"><span>Importar datos</span><label class="btn btn-secondary btn-sm" style="cursor:pointer;">Importar<input type="file" id="import-input" accept="application/json" style="display:none;"></label></div>
+        <div class="settings-row"><span>Actualizar catálogo de papers (Europe PMC)</span><button class="btn btn-secondary btn-sm" id="refresh-catalog-btn">Actualizar ahora</button></div>
+        <div class="settings-row"><span>Cerrar sesión de Google</span><button class="btn btn-ghost btn-sm" id="logout-btn">Cerrar sesión</button></div>
         <div class="settings-row"><span>Reiniciar tour de bienvenida</span><button class="btn btn-ghost btn-sm" id="restart-onboarding">Reiniciar tour</button></div>
         <div class="settings-row"><span>Borrar todos los datos</span><button class="btn btn-ghost btn-sm" id="reset-btn" style="color:var(--accent);border-color:var(--accent);">Resetear</button></div>
       </div>
@@ -1073,11 +896,6 @@ function renderSettings() {
 }
 
 function attachSettingsEvents() {
-  document.getElementById("logout-btn").addEventListener("click", () => {
-    if (confirm("¿Cerrar sesión? Tus datos quedan guardados para la próxima vez que inicies sesión con esta misma cuenta.")) {
-      Auth.logout();
-    }
-  });
   document.querySelectorAll("#settings-topics .chip").forEach(chip => {
     chip.addEventListener("click", () => {
       const id = chip.dataset.topic;
@@ -1086,6 +904,7 @@ function attachSettingsEvents() {
       if (idx >= 0) arr.splice(idx, 1); else arr.push(id);
       persist();
       render();
+      refreshCatalog().then(render);
     });
   });
   document.querySelectorAll("#settings-feedstyle .chip").forEach(chip => {
@@ -1119,6 +938,18 @@ function attachSettingsEvents() {
       }
     };
     reader.readAsText(file);
+  });
+  document.getElementById("refresh-catalog-btn").addEventListener("click", async () => {
+    showToast("Actualizando papers desde Europe PMC…");
+    EuropePMC.clearCache();
+    await refreshCatalog();
+    render();
+    showToast("Catálogo actualizado");
+  });
+  document.getElementById("logout-btn").addEventListener("click", () => {
+    if (confirm("¿Cerrar sesión? Tus datos quedan guardados en tu cuenta de Google.")) {
+      Auth.signOut();
+    }
   });
   document.getElementById("restart-onboarding").addEventListener("click", () => {
     PROFILE.onboardingCompleted = false;
@@ -1318,13 +1149,15 @@ const Onboarding = {
     });
   },
 
-  finish() {
+  async finish() {
     this.draft.onboardingCompleted = true;
     PROFILE = Object.assign(PROFILE, this.draft);
     persist();
     this.unmount();
     this.reset();
     currentRoute = "home";
+    showToast("Buscando papers reales en Europe PMC…");
+    await refreshCatalog();
     render();
     showToast("¡Bienvenido a PaperStreak! 🎉");
   },
@@ -1355,4 +1188,5 @@ async function init() {
 }
 
 window.navigate = navigate;
-document.addEventListener("DOMContentLoaded", init);
+// init() ya no se llama aquí: lo dispara auth.js una vez que el usuario
+// inicia sesión con Google (ver onSignedIn en auth.js).

@@ -4,9 +4,10 @@ const ASSETS = [
   "./index.html",
   "./styles.css",
   "./app.js",
-  "./config.js",
+  "./auth.js",
+  "./europepmc.js",
+  "./firebase-config.js",
   "./manifest.json",
-  "./data/papers.json",
   "./data/topics.json",
 ];
 
@@ -28,6 +29,12 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
+  // Las llamadas a APIs externas (Europe PMC, Firebase) nunca deben
+  // servirse desde cache: necesitamos siempre el paper/estado real.
+  const isSameOrigin = new URL(event.request.url).origin === self.location.origin;
+  if (!isSameOrigin) return; // deja pasar directo a la red
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;

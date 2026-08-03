@@ -8,14 +8,6 @@
 <meta name="theme-color" content="#c1440e">
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="styles.css">
-<!--
-  Google Identity Services (Sign In With Google).
-  Configura tu Client ID en config.js antes de desplegar.
-  No requiere backend: el ID token se decodifica en el cliente
-  solo para mostrar nombre/avatar y separar perfiles locales.
--->
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="config.js"></script>
 </head>
 <body>
 <a href="#view" class="skip-link">Saltar al contenido</a>
@@ -23,6 +15,11 @@
   <header class="topbar" id="topbar"></header>
   <main id="view" tabindex="-1"></main>
 </div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="europepmc.js"></script>
 <script src="app.js"></script>
+<script src="auth.js"></script>
 </body>
 </html>

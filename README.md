@@ -1,6 +1,44 @@
 # PaperStreak — Ciencia real, todos los días
 
-Web app estática (HTML/CSS/JS puro) que ayuda a formar el hábito de leer papers científicos de acceso abierto, con onboarding guiado, recomendación diaria, lectura in-app, quiz de comprensión y gamificación. Sin backend, sin login, todo el estado vive en `localStorage`.
+Web app (HTML/CSS/JS puro) que ayuda a formar el hábito de leer papers científicos reales de acceso abierto, con onboarding guiado, recomendación diaria, lectura in-app del texto completo, quiz de comprensión y gamificación.
+
+## ⚠️ Antes de usarla: configura el login con Google
+
+Esta versión requiere iniciar sesión con Google (vía Firebase Authentication) y ya NO
+usa datos de ejemplo/mock: busca papers reales y abiertos en la API pública de
+**Europe PMC** en tiempo real.
+
+1. Crea un proyecto gratis en https://console.firebase.google.com/
+2. Dentro del proyecto: **Authentication → Sign-in method → habilita "Google"**.
+3. **Configuración del proyecto → Tus apps → agrega una app Web**, y copia el objeto
+   `firebaseConfig` que te entrega dentro de `firebase-config.js`.
+4. En **Authentication → Settings → Authorized domains**, agrega el dominio donde
+   publiques la app (o `localhost` para probar en tu máquina).
+5. Sirve la carpeta con un servidor estático (ej. `npx serve` o GitHub Pages) — el
+   login con Google no funciona abriendo `index.html` con `file://`.
+
+Sin este paso, la app muestra una pantalla explicando que falta configurar Firebase
+en vez de romperse silenciosamente.
+
+## Papers reales, no simulados
+
+`data/papers.json` (el catálogo mock de 30 papers) ya no se usa para armar el feed.
+`europepmc.js` consulta la API REST pública de Europe PMC
+(`https://www.ebi.ac.uk/europepmc/webservices/rest/search`) filtrando por
+`OPEN_ACCESS:Y`, según los temas de interés elegidos en el onboarding, y guarda el
+resultado en caché local por 12 horas. Cada tarjeta enlaza a la página real del
+artículo en Europe PMC (o a su DOI), así que nunca debería llevar a una fuente
+inexistente.
+
+## Lectura del texto completo, no resúmenes
+
+El lector (`renderReader`) ya no reescribe el abstract como "resumen breve" ni
+inventa "puntos clave" o "términos difíciles". Muestra el abstract real del
+artículo y, cuando Europe PMC tiene indexado el texto completo (`fullTextXML`,
+disponible para el subconjunto de artículos PMC de acceso abierto), lo renderiza
+completo dentro de la app. Si Europe PMC no distribuye el texto completo para ese
+artículo en particular, se lo dice explícitamente al usuario y ofrece el enlace
+directo a la fuente original — nunca genera un resumen como sustituto.
 
 ## 1. Visión del producto
 
@@ -27,7 +65,6 @@ paperstreak/
 ├── styles.css
 ├── app.js
 ├── manifest.json
-├── config.js
 ├── icon.svg
 ├── sw.js
 ├── README.md
@@ -37,38 +74,7 @@ paperstreak/
     └── sample-profile.json
 ```
 
-## 4. Login con Google
-
-PaperStreak sigue sin backend, así que el login con Google es una capa de **identidad**, no de autenticación de servidor:
-
-- Usa [Google Identity Services](https://developers.google.com/identity/gsi/web) (`accounts.google.com/gsi/client`), gratis y sin backend.
-- Al iniciar sesión, se decodifica el ID token (JWT) en el propio navegador para obtener `name`, `email` y `picture`. **No hay verificación criptográfica de la firma** porque eso requiere un servidor; para este producto es suficiente, ya que el único propósito es personalizar la UI y separar perfiles.
-- Cada cuenta de Google (identificada por `sub`) tiene su propio perfil en `localStorage`, bajo la clave `paperstreak:profile:v1:<sub>`. Así, dos personas distintas que usan el mismo navegador no mezclan su racha ni su historial.
-- También existe la opción **"Continuar sin cuenta"**, que usa un perfil `guest` local, para no obligar a nadie a autenticarse.
-- Cerrar sesión (botón en Ajustes) solo cambia de perfil activo; **no borra datos**, así que volver a iniciar sesión con la misma cuenta restaura todo.
-
-### Configurar tu Client ID de Google
-
-1. Ve a [Google Cloud Console → Credenciales](https://console.cloud.google.com/apis/credentials).
-2. Crea un **OAuth 2.0 Client ID** de tipo **Web application**.
-3. En **Authorized JavaScript origins** agrega los orígenes donde correrá la app, por ejemplo:
-   - `http://localhost:8080`
-   - `https://TU_USUARIO.github.io`
-4. Copia el Client ID (termina en `.apps.googleusercontent.com`) y pégalo en `config.js`:
-   ```js
-   window.PAPERSTREAK_CONFIG = {
-     GOOGLE_CLIENT_ID: "1234567890-abc123.apps.googleusercontent.com",
-   };
-   ```
-5. No hace falta "Client secret": el flujo de Sign In With Google usado aquí es 100% client-side.
-
-Si `config.js` no tiene un Client ID válido, la app sigue funcionando: el botón de Google simplemente queda deshabilitado y solo se ofrece "Continuar sin cuenta".
-
-### Migrar a autenticación real (con backend)
-
-Si en el futuro se necesita verificar la identidad de forma segura (por ejemplo, para sincronizar datos entre dispositivos), el ID token de Google ya viene listo para enviarse a un backend y verificarse ahí con la librería oficial `google-auth-library`. El cliente no necesita cambios más allá de agregar esa llamada a la API.
-
-## 5. Cómo funciona el onboarding
+## 4. Cómo funciona el onboarding
 
 1. **Bienvenida**: explica qué hace la app, cuánto toma leer al día y que todo se guarda localmente.
 2. **Intereses**: áreas principales, temas excluidos, idioma, nivel de lectura.
@@ -78,7 +84,7 @@ Si en el futuro se necesita verificar la identidad de forma segura (por ejemplo,
 
 Al confirmar, `Onboarding.finish()` copia el "draft" al `PROFILE` real, marca `onboardingCompleted = true`, persiste y nunca vuelve a mostrarse salvo que el usuario pulse "Reiniciar tour" en Ajustes.
 
-## 6. Motor de recomendación
+## 5. Motor de recomendación
 
 `RecommendationEngine.scorePaper(paper, profile)` calcula un score 0–1 (o `-1` si el paper queda descartado por reglas duras) combinando:
 
@@ -102,7 +108,7 @@ El estilo de feed elegido en onboarding añade un pequeño bonus adicional (`sty
 
 Extender el motor es directo: agregar un factor nuevo implica sumar una clave a `weights`, calcular su valor en `scorePaper` y sumarlo a la fórmula final.
 
-## 7. Persistencia local
+## 6. Persistencia local
 
 Todo vive bajo la key `paperstreak:profile:v1` en `localStorage`, como un único objeto JSON:
 
@@ -122,7 +128,7 @@ Todo vive bajo la key `paperstreak:profile:v1` en `localStorage`, como un único
 - El botón "Resetear" en Ajustes borra la key completa y regenera el perfil por defecto.
 - Se eligió `localStorage` (no IndexedDB) porque el volumen de datos por usuario es pequeño (perfil + arrays de IDs), y mantiene el código simple para un MVP estático. Si el catálogo de papers creciera mucho (miles de registros) o se necesitara indexar full-text, IndexedDB sería la migración natural — la capa `Store` está aislada precisamente para facilitar ese cambio sin tocar el resto de la app.
 
-## 8. Cómo correr localmente
+## 7. Cómo correr localmente
 
 No requiere `npm install`. Basta un servidor estático simple (por `fetch` de JSON, no funciona con `file://`):
 
@@ -138,7 +144,7 @@ o con Node:
 npx serve .
 ```
 
-## 9. Deploy en GitHub Pages
+## 8. Deploy en GitHub Pages
 
 1. Crea un repositorio nuevo en GitHub, por ejemplo `paperstreak`.
 2. Dentro de la carpeta `paperstreak/`:
@@ -157,7 +163,7 @@ npx serve .
 
 No hay variables de entorno ni claves que configurar para el MVP: todo funciona con los JSON locales.
 
-## 10. Cómo reemplazar el mock por datos reales
+## 9. Cómo reemplazar el mock por datos reales
 
 La capa de datos está aislada en `loadData()` (fetch a `data/papers.json`). Para conectar fuentes reales sin reescribir la UI ni el motor de recomendación:
 
@@ -172,14 +178,14 @@ La capa de datos está aislada en `loadData()` (fetch a `data/papers.json`). Par
 4. En `loadData()`, reemplaza (o combina) el `fetch("data/papers.json")` por llamadas a estas APIs, normaliza la respuesta, y cachea el resultado en `localStorage` (p. ej. `paperstreak:papers-cache`) con una fecha de expiración de 24h para no golpear las APIs en cada carga.
 5. El `RecommendationEngine` no necesita cambios: solo espera el array `PAPERS` con esos campos.
 
-## 11. Cómo expandir el ranking y la recomendación
+## 10. Cómo expandir el ranking y la recomendación
 
 - Ajusta pesos en `RecommendationEngine.weights` para experimentar (ideal para un futuro panel de "modo debug" que muestre el `breakdown` crudo).
 - Agrega nuevas señales (ej. "tiempo desde la última vez que el usuario leyó ese tema" para espaciar repaso) sumando un factor más a `scorePaper`.
 - Para introducir **co-lectura social** (qué leen otros usuarios), se necesitaría un backend ligero o un servicio serverless — hoy el diseño es intencionalmente single-user y local-first.
 - Para historial más largo/analítica más fina, considera migrar `stats` de `localStorage` a IndexedDB (ver sección 6).
 
-## 12. Mejoras futuras
+## 11. Mejoras futuras
 
 - Integración real y cacheada con Europe PMC / OpenAlex / Crossref.
 - Modo "repaso espaciado" para temas con baja retención en el quiz.
@@ -189,7 +195,7 @@ La capa de datos está aislada en `loadData()` (fetch a `data/papers.json`). Par
 - Soporte multi-perfil en el mismo navegador (ej. familia o clase).
 - Sincronización opcional entre dispositivos vía un backend mínimo (Supabase/Firebase) — opcional y desacoplado del modo local-first.
 
-## 13. Riesgos técnicos y cómo se resuelven
+## 12. Riesgos técnicos y cómo se resuelven
 
 | Riesgo | Mitigación |
 |---|---|
@@ -199,5 +205,3 @@ La capa de datos está aislada en `loadData()` (fetch a `data/papers.json`). Par
 | CORS al llamar APIs externas desde el navegador | Europe PMC, Crossref, OpenAlex y arXiv soportan CORS para GET; si una fuente no lo soporta, usar un proxy propio o Cloudflare Worker gratuito como intermediario. |
 | Cálculo de "18 meses" es aproximado (mock no tiene fecha exacta) | Documentado en `monthsSincePublication()`; al integrar APIs reales se debe usar la fecha de publicación exacta (`publication_date`) en vez de aproximar por año. |
 | Accesibilidad / navegación por teclado | Botones nativos (`<button>`), `:focus-visible` visible, skip-link al contenido, buen contraste en ambos temas. |
-| El login con Google no verifica la firma del token (no hay servidor) | Aceptable para personalización/identidad local; documentado en la sección 4. Si se necesita seguridad real, migrar la verificación del ID token a un backend. |
-| Client ID de Google mal configurado o ausente | La app detecta esto (`Auth.isReady()`) y degrada con gracia a "Continuar sin cuenta" sin romper el flujo. |
