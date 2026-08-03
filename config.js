@@ -10,5 +10,5 @@
 //      https://TU_USUARIO.github.io
 // 4. Copia el Client ID (termina en .apps.googleusercontent.com) abajo.
 window.PAPERSTREAK_CONFIG = {
-  GOOGLE_CLIENT_ID: "TU_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+  GOOGLE_CLIENT_ID: "241590415880-fh3q2p5816mvhvqnue4msf9mvf1b494d.apps.googleusercontent.com",
 };
