@@ -57,11 +57,35 @@ const Catalog = {
       });
     });
 
-    const batches = await Promise.all(jobs);
+    let batches = await Promise.all(jobs);
+    let flat = batches.flat();
+
+    // Red de seguridad: si por algún motivo ningún tema/fuente trajo nada
+    // (ej. sin conexión momentánea, límite de tasa, tema muy nicho), no nos
+    // quedamos sin catálogo: probamos una búsqueda amplia y genérica por
+    // fuente antes de rendirnos, para garantizar que siempre haya de dónde
+    // elegir al menos un paper real.
+    if (flat.length === 0 && sourceKeys.length > 0) {
+      const genericTopics = [
+        { id: (chosenTopics[0] && chosenTopics[0].id) || "general", label: "science", sub: [] },
+        { id: (chosenTopics[0] && chosenTopics[0].id) || "general", label: "research", sub: [] },
+      ];
+      const fallbackJobs = [];
+      sourceKeys.forEach(key => {
+        const source = this.REGISTRY[key].impl();
+        if (!source) return;
+        genericTopics.forEach(topic => {
+          fallbackJobs.push(source.searchByTopic(topic).catch(() => []));
+        });
+      });
+      const fallbackBatches = await Promise.all(fallbackJobs);
+      flat = fallbackBatches.flat();
+    }
+
     const seenIds = new Set();
     const seenDois = new Set();
     const papers = [];
-    batches.flat().forEach(p => {
+    flat.forEach(p => {
       if (!p) return;
       if (seenIds.has(p.id)) return;
       if (p.doi && seenDois.has(p.doi)) return; // mismo paper indexado en dos fuentes

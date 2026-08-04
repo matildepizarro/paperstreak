@@ -145,11 +145,15 @@ const RecommendationEngine = {
     const read = new Set(profile.stats.papersRead || []);
     const excluded = new Set(interests.excludedTopics || []);
 
-    if (paper.topics.some(t => excluded.has(t))) return { score: -1, breakdown: {} };
-    if (!paper.isOpenAccess) return { score: -1, breakdown: {} };
+    // Los filtros "duros" (excluidos, acceso abierto, antigüedad) se pueden
+    // relajar progresivamente vía opts cuando no hay resultados suficientes,
+    // para garantizar que siempre aparezca al menos un paper.
+    if (!opts.ignoreExcluded && paper.topics.some(t => excluded.has(t))) return { score: -1, breakdown: {} };
+    if (!opts.ignoreOpenAccess && !paper.isOpenAccess) return { score: -1, breakdown: {} };
 
     const ageMonths = monthsSincePublication(paper.year);
-    if (ageMonths > 18) return { score: -1, breakdown: {} };
+    const maxAge = opts.maxAgeMonths != null ? opts.maxAgeMonths : 18;
+    if (!opts.ignoreAge && ageMonths > maxAge) return { score: -1, breakdown: {} };
 
     // Afinidad temática: combina (a) si el tema del paper está entre los
     // intereses del usuario y (b) qué tan "puro" es el paper en ese tema,
@@ -225,17 +229,42 @@ const RecommendationEngine = {
     return hits / keywords.length;
   },
 
+  /* Construye el feed diario probando niveles de filtro cada vez más
+     permisivos hasta encontrar al menos un paper. Así la pantalla de
+     "no encontramos papers" nunca debería aparecer mientras exista al
+     menos un paper en la base de datos. */
   buildDailyFeed(papers, profile) {
-    const scored = papers
-      .map(p => ({ paper: p, ...this.scorePaper(p, profile) }))
-      .filter(x => x.score >= 0)
-      .sort((a, b) => b.score - a.score);
+    if (!papers || papers.length === 0) return { main: null, alternatives: [] };
 
-    if (scored.length === 0) return { main: null, alternatives: [] };
+    const attempts = [
+      {}, // criterios normales
+      { maxAgeMonths: 36 }, // permite papers algo más antiguos
+      { ignoreAge: true }, // ignora antigüedad por completo
+      { ignoreAge: true, ignoreOpenAccess: true }, // ignora también acceso abierto
+      { ignoreAge: true, ignoreOpenAccess: true, ignoreExcluded: true }, // ignora temas excluidos
+    ];
 
-    const main = scored[0];
-    const alternatives = scored.slice(1, 4);
-    return { main, alternatives };
+    for (const opts of attempts) {
+      const scored = papers
+        .map(p => ({ paper: p, ...this.scorePaper(p, profile, opts) }))
+        .filter(x => x.score >= 0)
+        .sort((a, b) => b.score - a.score);
+      if (scored.length > 0) {
+        return { main: scored[0], alternatives: scored.slice(1, 4) };
+      }
+    }
+
+    // Última red de seguridad: si absolutamente nada calificó (por ejemplo,
+    // datos incompletos en algunos papers), elegimos igual algo para mostrar
+    // en vez de dejar al usuario sin nada. Se ordena por señales de calidad
+    // básicas, sin aplicar ningún filtro.
+    const fallbackSorted = papers.slice().sort((a, b) => {
+      const qa = (a.qualitySignals || 0) + (a.recencyScore || 0);
+      const qb = (b.qualitySignals || 0) + (b.recencyScore || 0);
+      return qb - qa;
+    }).map(p => ({ paper: p, score: 0, breakdown: {} }));
+
+    return { main: fallbackSorted[0], alternatives: fallbackSorted.slice(1, 4) };
   },
 
   reasonText(breakdown, paper) {
@@ -264,24 +293,49 @@ function renderTopicPicker(containerId, selectedIds) {
     const cat = t.category || "Otras";
     (categories[cat] = categories[cat] || []).push(t);
   });
-  const groupsHtml = Object.keys(categories).sort().map(cat => `
-    <div class="topic-group" data-group>
-      <div class="topic-group-title">${cat}</div>
+  const catNames = Object.keys(categories).sort();
+  const groupsHtml = catNames.map(cat => {
+    const items = categories[cat];
+    const selectedInGroup = items.filter(t => selectedIds.includes(t.id)).length;
+    return `
+    <details class="topic-group" data-group data-initial-open="${selectedInGroup > 0}" ${selectedInGroup > 0 ? "open" : ""}>
+      <summary class="topic-group-title">
+        <span class="topic-group-chevron">▸</span>
+        <span class="topic-group-name">${cat}</span>
+        <span class="topic-group-total">${items.length}</span>
+        ${selectedInGroup > 0 ? `<span class="group-count">${selectedInGroup}</span>` : ""}
+      </summary>
       <div class="chip-grid">
-        ${categories[cat].map(t => `
+        ${items.map(t => `
           <button type="button" class="chip ${selectedIds.includes(t.id) ? "selected" : ""}"
             data-topic="${t.id}" data-search="${(t.label + " " + (t.sub || []).join(" ")).toLowerCase()}">
             ${t.label}
           </button>
         `).join("")}
       </div>
-    </div>
-  `).join("");
+    </details>
+  `;
+  }).join("");
+
+  const selectedLabels = selectedIds
+    .map(id => (TOPICS.find(t => t.id === id) || {}).label)
+    .filter(Boolean);
 
   return `
     <div class="topic-picker" id="${containerId}">
-      <input type="search" class="topic-picker-search" placeholder="Buscar tema (ej. cardiología, robótica, educación...)" data-topic-search>
-      <div class="topic-picker-groups">${groupsHtml}</div>
+      <div class="topic-picker-toolbar">
+        <div class="topic-picker-searchwrap">
+          <span class="topic-picker-search-icon" aria-hidden="true">🔍</span>
+          <input type="search" class="topic-picker-search" placeholder="Buscar tema..." data-topic-search>
+        </div>
+        <span class="topic-picker-selected-count">${selectedIds.length ? `${selectedIds.length} elegido${selectedIds.length === 1 ? "" : "s"}` : "Ninguno elegido"}</span>
+      </div>
+      ${selectedLabels.length ? `
+        <div class="topic-picker-selected-row">
+          ${selectedLabels.map(l => `<span class="mini-chip">${l}</span>`).join("")}
+        </div>
+      ` : ""}
+      <div class="topic-picker-groups" data-topic-empty-hint="No se encontraron temas para esa búsqueda.">${groupsHtml}</div>
     </div>
   `;
 }
@@ -293,13 +347,19 @@ function attachTopicPickerSearch(containerId) {
   if (!input) return;
   input.addEventListener("input", () => {
     const q = input.value.trim().toLowerCase();
-    root.querySelectorAll(".chip[data-search]").forEach(chip => {
-      chip.style.display = !q || chip.dataset.search.includes(q) ? "" : "none";
-    });
+    let anyGroupVisible = false;
     root.querySelectorAll("[data-group]").forEach(group => {
-      const anyVisible = Array.from(group.querySelectorAll(".chip")).some(c => c.style.display !== "none");
+      const anyVisible = !q || Array.from(group.querySelectorAll(".chip")).some(c => {
+        const match = c.dataset.search.includes(q);
+        c.style.display = match ? "" : "none";
+        return match;
+      });
+      if (!q) group.querySelectorAll(".chip").forEach(c => (c.style.display = ""));
       group.style.display = anyVisible ? "" : "none";
+      group.open = q ? anyVisible : group.dataset.initialOpen === "true";
+      if (anyVisible) anyGroupVisible = true;
     });
+    root.querySelector(".topic-picker-groups").classList.toggle("is-empty", q && !anyGroupVisible);
   });
 }
 

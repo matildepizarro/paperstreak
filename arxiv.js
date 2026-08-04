@@ -6,26 +6,46 @@
    temas de IA, física, matemáticas e ingeniería.
    ========================================================= */
 const ArXivSource = {
-  BASE: "http://export.arxiv.org/api/query",
+  // IMPORTANTE: debe ser https. Con http, cualquier página https (GitHub
+  // Pages, Claude, etc.) bloquea la petición por "mixed content" y esta
+  // fuente queda muerta silenciosamente (sin error visible en pantalla).
+  BASE: "https://export.arxiv.org/api/query",
 
   async searchByTopic(topic, maxResults = 10) {
-    // Precisión: el tema principal debe aparecer en título o resumen, y
-    // opcionalmente reforzamos con los subtemas (también en ti/abs) para
-    // priorizar resultados realmente enfocados en el área, no solo
-    // relacionados de forma tangencial.
+    // Intentamos primero una consulta precisa (término en título/resumen) y,
+    // si no trae nada, vamos ampliando hasta encontrar algo: cualquier tema
+    // real tiene decenas de miles de papers en arXiv, así que casi siempre
+    // basta con el primer intento.
     const terms = [topic.label, ...(topic.sub || [])];
-    const q = terms.map(t => `ti:"${t}" OR abs:"${t}"`).join(" OR ");
-    const url = `${this.BASE}?search_query=${encodeURIComponent(q)}&start=0&max_results=${maxResults * 2}&sortBy=submittedDate&sortOrder=descending`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`arXiv respondió ${res.status}`);
-    const xmlText = await res.text();
-    const doc = new DOMParser().parseFromString(xmlText, "text/xml");
-    const entries = Array.from(doc.getElementsByTagName("entry"));
-    return entries
-      .map(e => this.normalize(e, topic.id))
-      .filter(Boolean)
-      .filter(p => this.isRelevant(p, topic))
-      .slice(0, maxResults);
+
+    const attempts = [
+      // 1) preciso: término exacto en título o resumen
+      () => terms.map(t => `ti:"${t}" OR abs:"${t}"`).join(" OR "),
+      // 2) más amplio: cualquier palabra del término (sin comillas)
+      () => terms.map(t => `all:${t.split(/\s+/).join(" AND ")}`).join(" OR "),
+      // 3) último recurso: solo la etiqueta del tema como texto libre
+      () => `all:${topic.label}`,
+    ];
+
+    for (let i = 0; i < attempts.length; i++) {
+      const q = attempts[i]();
+      try {
+        const url = `${this.BASE}?search_query=${encodeURIComponent(q)}&start=0&max_results=${maxResults * 2}&sortBy=submittedDate&sortOrder=descending`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`arXiv respondió ${res.status}`);
+        const xmlText = await res.text();
+        const doc = new DOMParser().parseFromString(xmlText, "text/xml");
+        const entries = Array.from(doc.getElementsByTagName("entry"));
+        const normalized = entries.map(e => this.normalize(e, topic.id)).filter(Boolean);
+        // En el primer intento exigimos relevancia estricta; en los
+        // siguientes ya no, porque el propio query ya es más laxo.
+        const filtered = i === 0 ? normalized.filter(p => this.isRelevant(p, topic)) : normalized;
+        if (filtered.length > 0) return filtered.slice(0, maxResults);
+      } catch (err) {
+        console.warn(`arXiv: intento ${i + 1} falló para ${topic.id}`, err);
+      }
+    }
+    return [];
   },
 
   isRelevant(paper, topic) {

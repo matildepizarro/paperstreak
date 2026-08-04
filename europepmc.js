@@ -35,22 +35,37 @@ const EuropePMC = {
   },
 
   async searchByTopic(topic, pageSize = 15) {
-    // Precisión: buscamos el tema y sus subtemas en TITLE o ABSTRACT (no en
-    // el texto completo), lo que evita falsos positivos por menciones de
-    // paso en cualquier parte del artículo.
-    const terms = [topic.label, ...(topic.sub || [])]
+    // Vamos ampliando la consulta en pasos hasta encontrar algo. El primer
+    // intento es el más preciso (título/resumen, acceso abierto, reciente);
+    // si un tema no trae resultados así, es mejor mostrar algo un poco menos
+    // exacto que no mostrar nada.
+    const termsQuoted = [topic.label, ...(topic.sub || [])]
       .map(t => `TITLE:"${t}" OR ABSTRACT:"${t}"`)
       .join(" OR ");
-    const query = `(${terms}) AND OPEN_ACCESS:Y AND IN_EPMC:Y AND (FIRST_PDATE:[${this.dateFrom()} TO ${this.dateTo()}])`;
-    const url = `${this.BASE}/search?query=${encodeURIComponent(query)}&format=json&resultType=core&pageSize=${pageSize}&sort=CITED%20desc`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Europe PMC respondió ${res.status}`);
-    const data = await res.json();
-    const results = (data.resultList && data.resultList.result) || [];
-    return results
-      .map(r => this.normalize(r, topic.id))
-      .filter(Boolean)
-      .filter(p => this.isRelevant(p, topic));
+    const termsFree = [topic.label, ...(topic.sub || [])].join(" OR ");
+
+    const attempts = [
+      { query: `(${termsQuoted}) AND OPEN_ACCESS:Y AND IN_EPMC:Y AND (FIRST_PDATE:[${this.dateFrom()} TO ${this.dateTo()}])`, strictRelevance: true },
+      { query: `(${termsQuoted}) AND OPEN_ACCESS:Y`, strictRelevance: true },
+      { query: `(${termsQuoted})`, strictRelevance: true },
+      { query: `(${termsFree})`, strictRelevance: false },
+    ];
+
+    for (const attempt of attempts) {
+      try {
+        const url = `${this.BASE}/search?query=${encodeURIComponent(attempt.query)}&format=json&resultType=core&pageSize=${pageSize}&sort=CITED%20desc`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Europe PMC respondió ${res.status}`);
+        const data = await res.json();
+        const results = (data.resultList && data.resultList.result) || [];
+        const normalized = results.map(r => this.normalize(r, topic.id)).filter(Boolean);
+        const filtered = attempt.strictRelevance ? normalized.filter(p => this.isRelevant(p, topic)) : normalized;
+        if (filtered.length > 0) return filtered;
+      } catch (err) {
+        console.warn("Europe PMC: intento falló para", topic.id, err);
+      }
+    }
+    return [];
   },
 
   /* Segundo filtro de precisión en el cliente: exige que el título o el

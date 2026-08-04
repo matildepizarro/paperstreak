@@ -152,17 +152,62 @@ main#view { flex: 1; padding: 28px 0 80px; }
 .ob-step-sub { color: var(--text-muted); margin: 0 0 20px; font-size: 0.95rem; animation: fadeInUp 0.4s ease both 0.05s; }
 .chip-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
 
-.topic-picker { margin-bottom: 8px; }
-.topic-picker-search {
-  width: 100%; box-sizing: border-box; padding: 10px 14px; margin-bottom: 12px;
-  border: 1px solid var(--border, #ddd); border-radius: 10px; font-size: 14px;
-  background: var(--bg-elevated, #fff); color: inherit;
+.topic-picker {
+  margin-bottom: 8px; background: var(--bg-muted, #f7f7f8); border: 1px solid var(--border, #eee);
+  border-radius: 16px; padding: 14px;
 }
-.topic-picker-groups { max-height: 320px; overflow-y: auto; padding-right: 4px; }
-.topic-group { margin-bottom: 14px; }
+.topic-picker-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.topic-picker-searchwrap { position: relative; flex: 1; }
+.topic-picker-search-icon {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  font-size: 13px; opacity: .5; pointer-events: none;
+}
+.topic-picker-search {
+  width: 100%; box-sizing: border-box; padding: 10px 14px 10px 34px;
+  border: 1px solid var(--border, #ddd); border-radius: 10px; font-size: 14px;
+  background: var(--bg-elevated, #fff); color: inherit; transition: border-color .15s ease, box-shadow .15s ease;
+}
+.topic-picker-search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.topic-picker-selected-count {
+  font-size: 12px; font-weight: 700; color: var(--accent); white-space: nowrap;
+  background: color-mix(in srgb, var(--accent) 12%, transparent); padding: 6px 10px; border-radius: 999px;
+}
+.topic-picker-selected-row {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; padding-bottom: 12px;
+  border-bottom: 1px dashed var(--border, #ddd);
+}
+.mini-chip {
+  font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+  background: var(--accent); color: #fff; opacity: .92;
+}
+.topic-picker-groups {
+  max-height: 380px; overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 6px;
+}
+.topic-picker-groups.is-empty::after {
+  content: attr(data-topic-empty-hint); display: block; font-size: 13px; color: var(--text-muted, #888);
+  font-style: italic; padding: 18px 4px; text-align: center;
+}
+.topic-group {
+  background: var(--bg-elevated, #fff); border: 1px solid var(--border, #eee); border-radius: 12px;
+  padding: 2px 12px; transition: border-color .15s ease;
+}
+.topic-group[open] { border-color: color-mix(in srgb, var(--accent) 35%, var(--border, #eee)); }
+.topic-group summary.topic-group-title { list-style: none; cursor: pointer; }
+.topic-group summary.topic-group-title::-webkit-details-marker { display: none; }
 .topic-group-title {
-  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-  color: var(--text-muted, #888); margin-bottom: 6px;
+  display: flex; align-items: center; gap: 8px; padding: 12px 0;
+  font-size: 13px; font-weight: 700; letter-spacing: .02em;
+  color: var(--text, inherit); user-select: none;
+}
+.topic-group-chevron { font-size: 11px; color: var(--text-muted, #888); transition: transform .18s ease; }
+.topic-group[open] .topic-group-chevron { transform: rotate(90deg); color: var(--accent); }
+.topic-group-name { flex: 1; }
+.topic-group-total { font-size: 11px; font-weight: 600; color: var(--text-muted, #888); }
+.topic-group .chip-grid { padding-bottom: 12px; animation: fadeInUp .18s ease both; }
+.group-count {
+  font-size: 11px; font-weight: 700; color: #fff; background: var(--accent);
+  border-radius: 999px; min-width: 18px; height: 18px; display: inline-flex; align-items: center;
+  justify-content: center; padding: 0 6px;
 }
 .chip-sub { font-size: 13px; opacity: .9; }
 .field-hint { font-size: 13px; color: var(--text-muted, #888); margin: -6px 0 10px; }
@@ -220,7 +265,8 @@ main#view { flex: 1; padding: 28px 0 80px; }
 }
 .chip {
   border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px; font-size: 0.88rem;
-  background: var(--bg); color: var(--text); font-weight: 600;
+  background: var(--bg); color: var(--text); font-weight: 600; cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, transform .1s ease;
 }
 .chip.selected { background: var(--accent); color: #fff; border-color: var(--accent); }
 .field-label { font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); margin: 18px 0 8px; }
