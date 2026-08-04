@@ -8,31 +8,6 @@
 const EuropePMC = {
   BASE: "https://www.ebi.ac.uk/europepmc/webservices/rest",
   CACHE_KEY: "paperstreak:epmc-cache:v1",
-  CACHE_TTL_HOURS: 12,
-
-  /* ---------- Construcción de catálogo por temas de interés ---------- */
-  async buildCatalog(topicsArr, mainTopicIds) {
-    const ids = (mainTopicIds && mainTopicIds.length ? mainTopicIds : topicsArr.slice(0, 3).map(t => t.id));
-    const cached = this.readCache();
-    const sameSelection = cached && cached.topicIds.slice().sort().join(",") === ids.slice().sort().join(",");
-    const fresh = cached && (Date.now() - cached.savedAt) < this.CACHE_TTL_HOURS * 3600 * 1000;
-    if (cached && sameSelection && fresh) return cached.papers;
-
-    const chosenTopics = topicsArr.filter(t => ids.includes(t.id));
-    const batches = await Promise.all(chosenTopics.map(t => this.searchByTopic(t).catch(err => {
-      console.warn("EuropePMC: fallo buscando tema", t.id, err);
-      return [];
-    })));
-
-    const seen = new Set();
-    const papers = [];
-    batches.flat().forEach(p => {
-      if (!seen.has(p.id)) { seen.add(p.id); papers.push(p); }
-    });
-
-    this.writeCache({ savedAt: Date.now(), topicIds: ids, papers });
-    return papers;
-  },
 
   async searchByTopic(topic, pageSize = 15) {
     // Vamos ampliando la consulta en pasos hasta encontrar algo. El primer
@@ -54,7 +29,7 @@ const EuropePMC = {
     for (const attempt of attempts) {
       try {
         const url = `${this.BASE}/search?query=${encodeURIComponent(attempt.query)}&format=json&resultType=core&pageSize=${pageSize}&sort=CITED%20desc`;
-        const res = await fetch(url);
+        const res = await fetchWithTimeout(url);
         if (!res.ok) throw new Error(`Europe PMC respondió ${res.status}`);
         const data = await res.json();
         const results = (data.resultList && data.resultList.result) || [];
@@ -186,16 +161,9 @@ const EuropePMC = {
     return (s || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   },
 
-  /* ---------- Cache local (evita golpear la API en cada carga) ---------- */
-  readCache() {
-    try {
-      const raw = localStorage.getItem(this.CACHE_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) { return null; }
-  },
-  writeCache(obj) {
-    try { localStorage.setItem(this.CACHE_KEY, JSON.stringify(obj)); } catch (e) {}
-  },
+  // Se mantiene solo para que "Actualizar catálogo ahora" en Ajustes pueda
+  // limpiar cualquier resto de una versión anterior que sí usaba esta caché
+  // por separado. El catálogo combinado real vive en Catalog (sources.js).
   clearCache() {
     localStorage.removeItem(this.CACHE_KEY);
   },

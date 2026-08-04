@@ -119,10 +119,30 @@ const Catalog = {
     return source.fetchFullText(paper);
   },
 
+  // Valida que lo guardado tenga la forma esperada antes de confiar en ello.
+  // Cualquier caché con datos corruptos, incompleta, o vacía (de una versión
+  // vieja de la app, o de un fallo previo) se descarta en vez de usarse:
+  // así un valor guardado "en mal estado" nunca puede volver a bloquear a
+  // nadie durante horas.
+  isValidCacheShape(obj) {
+    return !!obj &&
+      typeof obj.savedAt === "number" &&
+      Array.isArray(obj.topicIds) &&
+      Array.isArray(obj.sourceKeys) &&
+      Array.isArray(obj.papers) &&
+      obj.papers.length > 0 &&
+      obj.papers.every(p => p && typeof p.id === "string" && typeof p.title === "string" && Array.isArray(p.topics));
+  },
   readCache() {
     try {
       const raw = localStorage.getItem(this.CACHE_KEY);
-      return raw ? JSON.parse(raw) : null;
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!this.isValidCacheShape(parsed)) {
+        this.clearCache();
+        return null;
+      }
+      return parsed;
     } catch (e) { return null; }
   },
   writeCache(obj) {

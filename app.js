@@ -140,6 +140,10 @@ const RecommendationEngine = {
   },
 
   scorePaper(paper, profile, opts = {}) {
+    // Defensivo: si algún paper llega con datos incompletos (fuente externa
+    // con un esquema inesperado), no debe romper todo el scoring del resto
+    // del catálogo — simplemente se lo trata como sin temas asociados.
+    if (!paper || !Array.isArray(paper.topics)) return { score: -1, breakdown: {} };
     const interests = profile.interests;
     const seen = new Set(profile.stats.papersSeen || []);
     const read = new Set(profile.stats.papersRead || []);

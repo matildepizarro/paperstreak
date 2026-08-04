@@ -27,7 +27,7 @@ const SemanticScholarSource = {
     for (const attempt of attempts) {
       try {
         const url = `${this.BASE}?query=${encodeURIComponent(query)}&fields=${this.FIELDS}&limit=${limit * 2}${attempt.params}`;
-        const res = await fetch(url);
+        const res = await fetchWithTimeout(url);
         if (!res.ok) throw new Error(`Semantic Scholar respondió ${res.status}`);
         const data = await res.json();
         const results = data.data || [];
