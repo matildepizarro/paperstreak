@@ -5,7 +5,7 @@
    Ajustes. Cachea el resultado combinado en localStorage.
    ========================================================= */
 const Catalog = {
-  CACHE_KEY: "paperstreak:catalog-cache:v1",
+  CACHE_KEY: "paperstreak:catalog-cache:v2",
   CACHE_TTL_HOURS: 12,
 
   REGISTRY: {
@@ -84,18 +84,11 @@ const Catalog = {
 
     // Última red de seguridad: si las fuentes en vivo fallaron por completo
     // (sin conexión, CORS bloqueado por el navegador, límite de tasa, etc.),
-    // usamos un catálogo local incluido con la app para que la persona nunca
-    // se quede sin ningún paper que leer, sin importar el tema elegido.
-    if (flat.length === 0) {
-      try {
-        const localRes = await fetch("data/papers.json");
-        if (localRes.ok) {
-          const localPapers = await localRes.json();
-          flat = (localPapers || []).map(p => ({ ...p, provider: p.provider || "local" }));
-        }
-      } catch (e) {
-        console.warn("Catalog: no se pudo cargar el catálogo local de respaldo", e);
-      }
+    // usamos un catálogo local embebido en el propio JS (sin fetch, así que
+    // no puede fallar por CORS ni por rutas relativas) para que la persona
+    // nunca se quede sin ningún paper que leer, sin importar el tema elegido.
+    if (flat.length === 0 && Array.isArray(window.LOCAL_PAPERS)) {
+      flat = window.LOCAL_PAPERS.map(p => ({ ...p, provider: p.provider || "local" }));
     }
 
     const seenIds = new Set();
@@ -110,7 +103,11 @@ const Catalog = {
       papers.push(p);
     });
 
-    this.writeCache({ savedAt: Date.now(), topicIds, sourceKeys, subTopics, papers });
+    if (papers.length > 0) {
+      this.writeCache({ savedAt: Date.now(), topicIds, sourceKeys, subTopics, papers });
+    } else {
+      this.clearCache();
+    }
     return papers;
   },
 
