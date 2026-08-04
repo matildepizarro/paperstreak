@@ -1,18 +1,1252 @@
 [
-  { "id": "voice-speech", "label": "Voz y lenguaje", "sub": ["voz", "prosodia", "trastornos del habla", "acústica vocal"] },
-  { "id": "speech-therapy", "label": "Fonoaudiología", "sub": ["terapia del habla", "deglución", "audiología clínica"] },
-  { "id": "medicine", "label": "Medicina", "sub": ["medicina interna", "diagnóstico", "ensayos clínicos"] },
-  { "id": "neuroscience", "label": "Neurociencia", "sub": ["neuroimagen", "plasticidad cerebral", "neurodegeneración"] },
-  { "id": "public-health", "label": "Salud pública", "sub": ["epidemiología", "políticas de salud", "prevención"] },
-  { "id": "psychology", "label": "Psicología", "sub": ["cognición", "psicología clínica", "desarrollo"] },
-  { "id": "ai", "label": "Inteligencia artificial", "sub": ["aprendizaje profundo", "NLP", "modelos generativos"] },
-  { "id": "biology", "label": "Biología", "sub": ["biología molecular", "genética", "evolución"] },
-  { "id": "music", "label": "Música", "sub": ["cognición musical", "acústica musical", "terapia musical"] },
-  { "id": "education", "label": "Educación", "sub": ["aprendizaje", "tecnología educativa", "pedagogía"] },
-  { "id": "social-science", "label": "Ciencias sociales", "sub": ["sociología", "antropología", "economía conductual"] },
-  { "id": "engineering", "label": "Ingeniería", "sub": ["biomédica", "software", "señales"] },
-  { "id": "bioinformatics", "label": "Bioinformática", "sub": ["genómica computacional", "estructura de proteínas"] },
-  { "id": "clinical", "label": "Clínica", "sub": ["diagnóstico clínico", "tratamiento", "casos clínicos"] },
-  { "id": "rehabilitation", "label": "Rehabilitación", "sub": ["rehabilitación motora", "rehabilitación cognitiva", "terapia ocupacional"] },
-  { "id": "other", "label": "Otras", "sub": ["divulgación", "interdisciplinar"] }
+  {
+    "id": "voice-speech",
+    "label": "Voz y lenguaje",
+    "category": "Salud y medicina",
+    "sub": [
+      "voz",
+      "prosodia",
+      "trastornos del habla",
+      "acústica vocal"
+    ]
+  },
+  {
+    "id": "speech-therapy",
+    "label": "Fonoaudiología",
+    "category": "Salud y medicina",
+    "sub": [
+      "terapia del habla",
+      "deglución",
+      "audiología clínica"
+    ]
+  },
+  {
+    "id": "medicine",
+    "label": "Medicina interna",
+    "category": "Salud y medicina",
+    "sub": [
+      "diagnóstico clínico",
+      "ensayos clínicos",
+      "medicina interna"
+    ]
+  },
+  {
+    "id": "cardiology",
+    "label": "Cardiología",
+    "category": "Salud y medicina",
+    "sub": [
+      "enfermedad cardiovascular",
+      "arritmia",
+      "insuficiencia cardíaca"
+    ]
+  },
+  {
+    "id": "oncology",
+    "label": "Oncología",
+    "category": "Salud y medicina",
+    "sub": [
+      "cáncer",
+      "quimioterapia",
+      "inmunoterapia oncológica"
+    ]
+  },
+  {
+    "id": "endocrinology",
+    "label": "Endocrinología",
+    "category": "Salud y medicina",
+    "sub": [
+      "diabetes",
+      "tiroides",
+      "metabolismo hormonal"
+    ]
+  },
+  {
+    "id": "pediatrics",
+    "label": "Pediatría",
+    "category": "Salud y medicina",
+    "sub": [
+      "desarrollo infantil",
+      "pediatría clínica",
+      "vacunación infantil"
+    ]
+  },
+  {
+    "id": "geriatrics",
+    "label": "Geriatría",
+    "category": "Salud y medicina",
+    "sub": [
+      "envejecimiento",
+      "fragilidad",
+      "demencia senil"
+    ]
+  },
+  {
+    "id": "immunology",
+    "label": "Inmunología",
+    "category": "Salud y medicina",
+    "sub": [
+      "respuesta inmune",
+      "autoinmunidad",
+      "vacunas"
+    ]
+  },
+  {
+    "id": "infectious-disease",
+    "label": "Enfermedades infecciosas",
+    "category": "Salud y medicina",
+    "sub": [
+      "virología clínica",
+      "resistencia antimicrobiana",
+      "brotes epidémicos"
+    ]
+  },
+  {
+    "id": "dermatology",
+    "label": "Dermatología",
+    "category": "Salud y medicina",
+    "sub": [
+      "enfermedades de la piel",
+      "dermatitis",
+      "cáncer de piel"
+    ]
+  },
+  {
+    "id": "ophthalmology",
+    "label": "Oftalmología",
+    "category": "Salud y medicina",
+    "sub": [
+      "salud visual",
+      "retina",
+      "glaucoma"
+    ]
+  },
+  {
+    "id": "dentistry",
+    "label": "Odontología",
+    "category": "Salud y medicina",
+    "sub": [
+      "salud bucal",
+      "ortodoncia",
+      "caries dental"
+    ]
+  },
+  {
+    "id": "pharmacology",
+    "label": "Farmacología",
+    "category": "Salud y medicina",
+    "sub": [
+      "farmacocinética",
+      "desarrollo de fármacos",
+      "interacciones medicamentosas"
+    ]
+  },
+  {
+    "id": "surgery",
+    "label": "Cirugía",
+    "category": "Salud y medicina",
+    "sub": [
+      "técnicas quirúrgicas",
+      "cirugía mínimamente invasiva",
+      "cirugía robótica"
+    ]
+  },
+  {
+    "id": "radiology",
+    "label": "Radiología",
+    "category": "Salud y medicina",
+    "sub": [
+      "imagenología médica",
+      "resonancia magnética",
+      "tomografía"
+    ]
+  },
+  {
+    "id": "nursing",
+    "label": "Enfermería",
+    "category": "Salud y medicina",
+    "sub": [
+      "cuidados de enfermería",
+      "práctica clínica",
+      "atención al paciente"
+    ]
+  },
+  {
+    "id": "nutrition",
+    "label": "Nutrición",
+    "category": "Salud y medicina",
+    "sub": [
+      "dieta y salud",
+      "nutrición clínica",
+      "obesidad"
+    ]
+  },
+  {
+    "id": "sleep-science",
+    "label": "Ciencia del sueño",
+    "category": "Salud y medicina",
+    "sub": [
+      "trastornos del sueño",
+      "insomnio",
+      "apnea del sueño"
+    ]
+  },
+  {
+    "id": "pain-medicine",
+    "label": "Medicina del dolor",
+    "category": "Salud y medicina",
+    "sub": [
+      "dolor crónico",
+      "analgesia",
+      "dolor neuropático"
+    ]
+  },
+  {
+    "id": "neuroscience",
+    "label": "Neurociencia",
+    "category": "Neurociencia y psicología",
+    "sub": [
+      "neuroimagen",
+      "plasticidad cerebral",
+      "neurodegeneración"
+    ]
+  },
+  {
+    "id": "cognitive-neuroscience",
+    "label": "Neurociencia cognitiva",
+    "category": "Neurociencia y psicología",
+    "sub": [
+      "atención",
+      "memoria de trabajo",
+      "toma de decisiones"
+    ]
+  },
+  {
+    "id": "psychology",
+    "label": "Psicología",
+    "category": "Neurociencia y psicología",
+    "sub": [
+      "cognición",
+      "psicología clínica",
+      "desarrollo"
+    ]
+  },
+  {
+    "id": "psychiatry",
+    "label": "Psiquiatría",
+    "category": "Neurociencia y psicología",
+    "sub": [
+      "depresión",
+      "ansiedad",
+      "trastornos psiquiátricos"
+    ]
+  },
+  {
+    "id": "developmental-psychology",
+    "label": "Psicología del desarrollo",
+    "category": "Neurociencia y psicología",
+    "sub": [
+      "desarrollo infantil",
+      "apego",
+      "adolescencia"
+    ]
+  },
+  {
+    "id": "social-psychology",
+    "label": "Psicología social",
+    "category": "Neurociencia y psicología",
+    "sub": [
+      "influencia social",
+      "prejuicio",
+      "identidad grupal"
+    ]
+  },
+  {
+    "id": "neuropsychology",
+    "label": "Neuropsicología",
+    "category": "Neurociencia y psicología",
+    "sub": [
+      "evaluación neuropsicológica",
+      "daño cerebral",
+      "funciones ejecutivas"
+    ]
+  },
+  {
+    "id": "psycholinguistics",
+    "label": "Psicolingüística",
+    "category": "Neurociencia y psicología",
+    "sub": [
+      "procesamiento del lenguaje",
+      "bilingüismo",
+      "adquisición del lenguaje"
+    ]
+  },
+  {
+    "id": "behavioral-science",
+    "label": "Ciencia del comportamiento",
+    "category": "Neurociencia y psicología",
+    "sub": [
+      "toma de decisiones",
+      "hábitos",
+      "economía conductual"
+    ]
+  },
+  {
+    "id": "addiction-science",
+    "label": "Ciencia de las adicciones",
+    "category": "Neurociencia y psicología",
+    "sub": [
+      "adicción",
+      "dependencia",
+      "neurobiología de la recompensa"
+    ]
+  },
+  {
+    "id": "public-health",
+    "label": "Salud pública",
+    "category": "Salud pública y epidemiología",
+    "sub": [
+      "epidemiología",
+      "políticas de salud",
+      "prevención"
+    ]
+  },
+  {
+    "id": "epidemiology",
+    "label": "Epidemiología",
+    "category": "Salud pública y epidemiología",
+    "sub": [
+      "vigilancia epidemiológica",
+      "modelos de brotes",
+      "factores de riesgo"
+    ]
+  },
+  {
+    "id": "global-health",
+    "label": "Salud global",
+    "category": "Salud pública y epidemiología",
+    "sub": [
+      "equidad en salud",
+      "salud internacional",
+      "determinantes sociales"
+    ]
+  },
+  {
+    "id": "health-policy",
+    "label": "Políticas de salud",
+    "category": "Salud pública y epidemiología",
+    "sub": [
+      "sistemas de salud",
+      "cobertura sanitaria",
+      "gasto en salud"
+    ]
+  },
+  {
+    "id": "occupational-health",
+    "label": "Salud ocupacional",
+    "category": "Salud pública y epidemiología",
+    "sub": [
+      "riesgos laborales",
+      "ergonomía",
+      "seguridad en el trabajo"
+    ]
+  },
+  {
+    "id": "ai",
+    "label": "Inteligencia artificial",
+    "category": "Ciencias de la computación e IA",
+    "sub": [
+      "aprendizaje profundo",
+      "NLP",
+      "modelos generativos"
+    ]
+  },
+  {
+    "id": "machine-learning",
+    "label": "Aprendizaje automático",
+    "category": "Ciencias de la computación e IA",
+    "sub": [
+      "aprendizaje supervisado",
+      "redes neuronales",
+      "optimización"
+    ]
+  },
+  {
+    "id": "nlp",
+    "label": "Procesamiento del lenguaje natural",
+    "category": "Ciencias de la computación e IA",
+    "sub": [
+      "modelos de lenguaje",
+      "traducción automática",
+      "análisis de sentimiento"
+    ]
+  },
+  {
+    "id": "computer-vision",
+    "label": "Visión por computador",
+    "category": "Ciencias de la computación e IA",
+    "sub": [
+      "reconocimiento de imágenes",
+      "detección de objetos",
+      "segmentación"
+    ]
+  },
+  {
+    "id": "robotics",
+    "label": "Robótica",
+    "category": "Ciencias de la computación e IA",
+    "sub": [
+      "control robótico",
+      "manipulación robótica",
+      "robots autónomos"
+    ]
+  },
+  {
+    "id": "hci",
+    "label": "Interacción humano-computador",
+    "category": "Ciencias de la computación e IA",
+    "sub": [
+      "diseño de interfaces",
+      "usabilidad",
+      "experiencia de usuario"
+    ]
+  },
+  {
+    "id": "cybersecurity",
+    "label": "Ciberseguridad",
+    "category": "Ciencias de la computación e IA",
+    "sub": [
+      "seguridad informática",
+      "criptografía",
+      "vulnerabilidades"
+    ]
+  },
+  {
+    "id": "data-science",
+    "label": "Ciencia de datos",
+    "category": "Ciencias de la computación e IA",
+    "sub": [
+      "análisis de datos",
+      "big data",
+      "visualización de datos"
+    ]
+  },
+  {
+    "id": "software-engineering",
+    "label": "Ingeniería de software",
+    "category": "Ciencias de la computación e IA",
+    "sub": [
+      "arquitectura de software",
+      "testing",
+      "desarrollo ágil"
+    ]
+  },
+  {
+    "id": "distributed-systems",
+    "label": "Sistemas distribuidos",
+    "category": "Ciencias de la computación e IA",
+    "sub": [
+      "computación en la nube",
+      "sistemas paralelos",
+      "blockchain"
+    ]
+  },
+  {
+    "id": "ai-ethics",
+    "label": "Ética de la IA",
+    "category": "Ciencias de la computación e IA",
+    "sub": [
+      "sesgo algorítmico",
+      "IA responsable",
+      "gobernanza de datos"
+    ]
+  },
+  {
+    "id": "biology",
+    "label": "Biología",
+    "category": "Biología y ciencias de la vida",
+    "sub": [
+      "biología molecular",
+      "genética",
+      "evolución"
+    ]
+  },
+  {
+    "id": "genetics",
+    "label": "Genética",
+    "category": "Biología y ciencias de la vida",
+    "sub": [
+      "herencia genética",
+      "mutaciones",
+      "genómica"
+    ]
+  },
+  {
+    "id": "microbiology",
+    "label": "Microbiología",
+    "category": "Biología y ciencias de la vida",
+    "sub": [
+      "bacterias",
+      "virus",
+      "microbioma"
+    ]
+  },
+  {
+    "id": "cell-biology",
+    "label": "Biología celular",
+    "category": "Biología y ciencias de la vida",
+    "sub": [
+      "ciclo celular",
+      "señalización celular",
+      "organelos"
+    ]
+  },
+  {
+    "id": "ecology",
+    "label": "Ecología",
+    "category": "Biología y ciencias de la vida",
+    "sub": [
+      "ecosistemas",
+      "biodiversidad",
+      "interacciones ecológicas"
+    ]
+  },
+  {
+    "id": "evolutionary-biology",
+    "label": "Biología evolutiva",
+    "category": "Biología y ciencias de la vida",
+    "sub": [
+      "selección natural",
+      "filogenia",
+      "especiación"
+    ]
+  },
+  {
+    "id": "zoology",
+    "label": "Zoología",
+    "category": "Biología y ciencias de la vida",
+    "sub": [
+      "comportamiento animal",
+      "fauna",
+      "conservación de especies"
+    ]
+  },
+  {
+    "id": "botany",
+    "label": "Botánica",
+    "category": "Biología y ciencias de la vida",
+    "sub": [
+      "fisiología vegetal",
+      "taxonomía de plantas",
+      "fotosíntesis"
+    ]
+  },
+  {
+    "id": "marine-biology",
+    "label": "Biología marina",
+    "category": "Biología y ciencias de la vida",
+    "sub": [
+      "ecosistemas marinos",
+      "arrecifes de coral",
+      "especies marinas"
+    ]
+  },
+  {
+    "id": "bioinformatics",
+    "label": "Bioinformática",
+    "category": "Biología y ciencias de la vida",
+    "sub": [
+      "genómica computacional",
+      "estructura de proteínas",
+      "análisis de secuencias"
+    ]
+  },
+  {
+    "id": "biotechnology",
+    "label": "Biotecnología",
+    "category": "Biología y ciencias de la vida",
+    "sub": [
+      "ingeniería genética",
+      "biofabricación",
+      "biología sintética"
+    ]
+  },
+  {
+    "id": "virology",
+    "label": "Virología",
+    "category": "Biología y ciencias de la vida",
+    "sub": [
+      "replicación viral",
+      "vacunas virales",
+      "emergencia de virus"
+    ]
+  },
+  {
+    "id": "physics",
+    "label": "Física",
+    "category": "Física y astronomía",
+    "sub": [
+      "física de partículas",
+      "mecánica cuántica",
+      "relatividad"
+    ]
+  },
+  {
+    "id": "astrophysics",
+    "label": "Astrofísica",
+    "category": "Física y astronomía",
+    "sub": [
+      "formación estelar",
+      "cosmología",
+      "agujeros negros"
+    ]
+  },
+  {
+    "id": "astronomy",
+    "label": "Astronomía",
+    "category": "Física y astronomía",
+    "sub": [
+      "exoplanetas",
+      "observación astronómica",
+      "galaxias"
+    ]
+  },
+  {
+    "id": "condensed-matter",
+    "label": "Materia condensada",
+    "category": "Física y astronomía",
+    "sub": [
+      "superconductividad",
+      "materiales cuánticos",
+      "física del estado sólido"
+    ]
+  },
+  {
+    "id": "optics",
+    "label": "Óptica y fotónica",
+    "category": "Física y astronomía",
+    "sub": [
+      "láseres",
+      "fotónica",
+      "óptica cuántica"
+    ]
+  },
+  {
+    "id": "chemistry",
+    "label": "Química",
+    "category": "Química",
+    "sub": [
+      "química orgánica",
+      "química inorgánica",
+      "catálisis"
+    ]
+  },
+  {
+    "id": "materials-science",
+    "label": "Ciencia de materiales",
+    "category": "Química",
+    "sub": [
+      "nanomateriales",
+      "polímeros",
+      "materiales avanzados"
+    ]
+  },
+  {
+    "id": "biochemistry",
+    "label": "Bioquímica",
+    "category": "Química",
+    "sub": [
+      "enzimología",
+      "metabolismo bioquímico",
+      "proteínas"
+    ]
+  },
+  {
+    "id": "chemical-engineering",
+    "label": "Ingeniería química",
+    "category": "Química",
+    "sub": [
+      "procesos químicos",
+      "reactores",
+      "química industrial"
+    ]
+  },
+  {
+    "id": "mathematics",
+    "label": "Matemáticas",
+    "category": "Matemáticas y estadística",
+    "sub": [
+      "álgebra",
+      "análisis matemático",
+      "teoría de números"
+    ]
+  },
+  {
+    "id": "statistics",
+    "label": "Estadística",
+    "category": "Matemáticas y estadística",
+    "sub": [
+      "inferencia estadística",
+      "modelos estadísticos",
+      "diseño experimental"
+    ]
+  },
+  {
+    "id": "applied-mathematics",
+    "label": "Matemáticas aplicadas",
+    "category": "Matemáticas y estadística",
+    "sub": [
+      "modelado matemático",
+      "ecuaciones diferenciales",
+      "optimización matemática"
+    ]
+  },
+  {
+    "id": "engineering",
+    "label": "Ingeniería",
+    "category": "Ingeniería y tecnología",
+    "sub": [
+      "biomédica",
+      "señales",
+      "sistemas de control"
+    ]
+  },
+  {
+    "id": "biomedical-engineering",
+    "label": "Ingeniería biomédica",
+    "category": "Ingeniería y tecnología",
+    "sub": [
+      "dispositivos médicos",
+      "biomateriales",
+      "imagenología biomédica"
+    ]
+  },
+  {
+    "id": "civil-engineering",
+    "label": "Ingeniería civil",
+    "category": "Ingeniería y tecnología",
+    "sub": [
+      "infraestructura",
+      "estructuras",
+      "ingeniería sísmica"
+    ]
+  },
+  {
+    "id": "mechanical-engineering",
+    "label": "Ingeniería mecánica",
+    "category": "Ingeniería y tecnología",
+    "sub": [
+      "mecánica aplicada",
+      "diseño mecánico",
+      "termodinámica"
+    ]
+  },
+  {
+    "id": "electrical-engineering",
+    "label": "Ingeniería eléctrica",
+    "category": "Ingeniería y tecnología",
+    "sub": [
+      "circuitos electrónicos",
+      "procesamiento de señales",
+      "sistemas de potencia"
+    ]
+  },
+  {
+    "id": "aerospace-engineering",
+    "label": "Ingeniería aeroespacial",
+    "category": "Ingeniería y tecnología",
+    "sub": [
+      "aerodinámica",
+      "vuelo espacial",
+      "propulsión"
+    ]
+  },
+  {
+    "id": "environmental-engineering",
+    "label": "Ingeniería ambiental",
+    "category": "Ingeniería y tecnología",
+    "sub": [
+      "tratamiento de agua",
+      "gestión de residuos",
+      "contaminación"
+    ]
+  },
+  {
+    "id": "energy-systems",
+    "label": "Sistemas de energía",
+    "category": "Ingeniería y tecnología",
+    "sub": [
+      "energías renovables",
+      "almacenamiento de energía",
+      "redes eléctricas"
+    ]
+  },
+  {
+    "id": "nanotechnology",
+    "label": "Nanotecnología",
+    "category": "Ingeniería y tecnología",
+    "sub": [
+      "nanopartículas",
+      "nanomedicina",
+      "nanofabricación"
+    ]
+  },
+  {
+    "id": "earth-science",
+    "label": "Ciencias de la Tierra",
+    "category": "Ciencias de la Tierra y ambiente",
+    "sub": [
+      "geología",
+      "tectónica de placas",
+      "vulcanología"
+    ]
+  },
+  {
+    "id": "climate-science",
+    "label": "Ciencia del clima",
+    "category": "Ciencias de la Tierra y ambiente",
+    "sub": [
+      "cambio climático",
+      "modelos climáticos",
+      "calentamiento global"
+    ]
+  },
+  {
+    "id": "oceanography",
+    "label": "Oceanografía",
+    "category": "Ciencias de la Tierra y ambiente",
+    "sub": [
+      "corrientes oceánicas",
+      "química marina",
+      "clima oceánico"
+    ]
+  },
+  {
+    "id": "environmental-science",
+    "label": "Ciencias ambientales",
+    "category": "Ciencias de la Tierra y ambiente",
+    "sub": [
+      "contaminación ambiental",
+      "conservación",
+      "sostenibilidad"
+    ]
+  },
+  {
+    "id": "meteorology",
+    "label": "Meteorología",
+    "category": "Ciencias de la Tierra y ambiente",
+    "sub": [
+      "pronóstico del tiempo",
+      "fenómenos atmosféricos",
+      "clima extremo"
+    ]
+  },
+  {
+    "id": "music",
+    "label": "Música",
+    "category": "Arte, cultura y música",
+    "sub": [
+      "cognición musical",
+      "acústica musical",
+      "terapia musical"
+    ]
+  },
+  {
+    "id": "art-history",
+    "label": "Historia del arte",
+    "category": "Arte, cultura y música",
+    "sub": [
+      "movimientos artísticos",
+      "análisis de obras",
+      "patrimonio cultural"
+    ]
+  },
+  {
+    "id": "literature",
+    "label": "Literatura",
+    "category": "Arte, cultura y música",
+    "sub": [
+      "crítica literaria",
+      "narrativa",
+      "poesía"
+    ]
+  },
+  {
+    "id": "linguistics",
+    "label": "Lingüística",
+    "category": "Arte, cultura y música",
+    "sub": [
+      "fonología",
+      "sintaxis",
+      "semántica"
+    ]
+  },
+  {
+    "id": "philosophy",
+    "label": "Filosofía",
+    "category": "Arte, cultura y música",
+    "sub": [
+      "ética",
+      "epistemología",
+      "filosofía de la mente"
+    ]
+  },
+  {
+    "id": "history",
+    "label": "Historia",
+    "category": "Arte, cultura y música",
+    "sub": [
+      "historia contemporánea",
+      "historiografía",
+      "memoria histórica"
+    ]
+  },
+  {
+    "id": "archaeology",
+    "label": "Arqueología",
+    "category": "Arte, cultura y música",
+    "sub": [
+      "excavaciones",
+      "cultura material",
+      "arqueología prehistórica"
+    ]
+  },
+  {
+    "id": "anthropology",
+    "label": "Antropología",
+    "category": "Arte, cultura y música",
+    "sub": [
+      "antropología cultural",
+      "etnografía",
+      "parentesco"
+    ]
+  },
+  {
+    "id": "education",
+    "label": "Educación",
+    "category": "Educación",
+    "sub": [
+      "aprendizaje",
+      "tecnología educativa",
+      "pedagogía"
+    ]
+  },
+  {
+    "id": "higher-education",
+    "label": "Educación superior",
+    "category": "Educación",
+    "sub": [
+      "universidad",
+      "política educativa",
+      "investigación educativa"
+    ]
+  },
+  {
+    "id": "special-education",
+    "label": "Educación especial",
+    "category": "Educación",
+    "sub": [
+      "necesidades educativas especiales",
+      "inclusión educativa",
+      "discapacidad"
+    ]
+  },
+  {
+    "id": "early-childhood-education",
+    "label": "Educación temprana",
+    "category": "Educación",
+    "sub": [
+      "primera infancia",
+      "desarrollo preescolar",
+      "estimulación temprana"
+    ]
+  },
+  {
+    "id": "stem-education",
+    "label": "Educación STEM",
+    "category": "Educación",
+    "sub": [
+      "enseñanza de ciencias",
+      "enseñanza de matemáticas",
+      "alfabetización digital"
+    ]
+  },
+  {
+    "id": "social-science",
+    "label": "Ciencias sociales",
+    "category": "Ciencias sociales",
+    "sub": [
+      "sociología",
+      "antropología",
+      "economía conductual"
+    ]
+  },
+  {
+    "id": "sociology",
+    "label": "Sociología",
+    "category": "Ciencias sociales",
+    "sub": [
+      "estructura social",
+      "desigualdad",
+      "movimientos sociales"
+    ]
+  },
+  {
+    "id": "political-science",
+    "label": "Ciencia política",
+    "category": "Ciencias sociales",
+    "sub": [
+      "gobernanza",
+      "democracia",
+      "política pública"
+    ]
+  },
+  {
+    "id": "law",
+    "label": "Derecho",
+    "category": "Ciencias sociales",
+    "sub": [
+      "derecho constitucional",
+      "derechos humanos",
+      "política legal"
+    ]
+  },
+  {
+    "id": "criminology",
+    "label": "Criminología",
+    "category": "Ciencias sociales",
+    "sub": [
+      "delincuencia",
+      "justicia penal",
+      "prevención del delito"
+    ]
+  },
+  {
+    "id": "communication-studies",
+    "label": "Comunicación",
+    "category": "Ciencias sociales",
+    "sub": [
+      "medios de comunicación",
+      "comunicación digital",
+      "teoría de la comunicación"
+    ]
+  },
+  {
+    "id": "gender-studies",
+    "label": "Estudios de género",
+    "category": "Ciencias sociales",
+    "sub": [
+      "igualdad de género",
+      "identidad de género",
+      "violencia de género"
+    ]
+  },
+  {
+    "id": "urban-studies",
+    "label": "Estudios urbanos",
+    "category": "Ciencias sociales",
+    "sub": [
+      "planificación urbana",
+      "movilidad urbana",
+      "vivienda"
+    ]
+  },
+  {
+    "id": "demography",
+    "label": "Demografía",
+    "category": "Ciencias sociales",
+    "sub": [
+      "dinámica poblacional",
+      "migración",
+      "envejecimiento poblacional"
+    ]
+  },
+  {
+    "id": "economics",
+    "label": "Economía",
+    "category": "Economía y negocios",
+    "sub": [
+      "macroeconomía",
+      "microeconomía",
+      "política económica"
+    ]
+  },
+  {
+    "id": "business-management",
+    "label": "Administración de empresas",
+    "category": "Economía y negocios",
+    "sub": [
+      "gestión empresarial",
+      "estrategia organizacional",
+      "liderazgo"
+    ]
+  },
+  {
+    "id": "finance",
+    "label": "Finanzas",
+    "category": "Economía y negocios",
+    "sub": [
+      "mercados financieros",
+      "inversión",
+      "riesgo financiero"
+    ]
+  },
+  {
+    "id": "marketing",
+    "label": "Marketing",
+    "category": "Economía y negocios",
+    "sub": [
+      "comportamiento del consumidor",
+      "marketing digital",
+      "branding"
+    ]
+  },
+  {
+    "id": "entrepreneurship",
+    "label": "Emprendimiento",
+    "category": "Economía y negocios",
+    "sub": [
+      "startups",
+      "innovación empresarial",
+      "modelos de negocio"
+    ]
+  },
+  {
+    "id": "sports-science",
+    "label": "Ciencias del deporte",
+    "category": "Deporte y ejercicio",
+    "sub": [
+      "rendimiento deportivo",
+      "fisiología del ejercicio",
+      "entrenamiento deportivo"
+    ]
+  },
+  {
+    "id": "kinesiology",
+    "label": "Kinesiología",
+    "category": "Deporte y ejercicio",
+    "sub": [
+      "biomecánica",
+      "actividad física",
+      "rehabilitación física"
+    ]
+  },
+  {
+    "id": "agriculture",
+    "label": "Ciencias agrícolas",
+    "category": "Agricultura y ambiente",
+    "sub": [
+      "agricultura sostenible",
+      "producción de cultivos",
+      "suelos agrícolas"
+    ]
+  },
+  {
+    "id": "food-science",
+    "label": "Ciencia de los alimentos",
+    "category": "Agricultura y ambiente",
+    "sub": [
+      "seguridad alimentaria",
+      "tecnología de alimentos",
+      "nutrición alimentaria"
+    ]
+  },
+  {
+    "id": "veterinary-science",
+    "label": "Ciencias veterinarias",
+    "category": "Agricultura y ambiente",
+    "sub": [
+      "salud animal",
+      "medicina veterinaria",
+      "bienestar animal"
+    ]
+  },
+  {
+    "id": "forestry",
+    "label": "Ciencias forestales",
+    "category": "Agricultura y ambiente",
+    "sub": [
+      "manejo forestal",
+      "reforestación",
+      "incendios forestales"
+    ]
+  },
+  {
+    "id": "engineering-materials",
+    "label": "Ciencia e ingeniería de materiales",
+    "category": "Ingeniería y tecnología",
+    "sub": [
+      "materiales compuestos",
+      "caracterización de materiales",
+      "materiales sostenibles"
+    ]
+  },
+  {
+    "id": "transportation",
+    "label": "Ingeniería de transporte",
+    "category": "Ingeniería y tecnología",
+    "sub": [
+      "movilidad",
+      "transporte sostenible",
+      "vehículos autónomos"
+    ]
+  },
+  {
+    "id": "clinical",
+    "label": "Investigación clínica",
+    "category": "Salud y medicina",
+    "sub": [
+      "diagnóstico clínico",
+      "tratamiento",
+      "casos clínicos"
+    ]
+  },
+  {
+    "id": "rehabilitation",
+    "label": "Rehabilitación",
+    "category": "Salud y medicina",
+    "sub": [
+      "rehabilitación motora",
+      "rehabilitación cognitiva",
+      "terapia ocupacional"
+    ]
+  },
+  {
+    "id": "gerontology",
+    "label": "Gerontología",
+    "category": "Salud y medicina",
+    "sub": [
+      "envejecimiento saludable",
+      "cuidado del adulto mayor",
+      "longevidad"
+    ]
+  },
+  {
+    "id": "reproductive-health",
+    "label": "Salud reproductiva",
+    "category": "Salud y medicina",
+    "sub": [
+      "fertilidad",
+      "embarazo",
+      "salud materna"
+    ]
+  },
+  {
+    "id": "genomic-medicine",
+    "label": "Medicina genómica",
+    "category": "Salud y medicina",
+    "sub": [
+      "medicina de precisión",
+      "terapia génica",
+      "farmacogenómica"
+    ]
+  },
+  {
+    "id": "other",
+    "label": "Otras áreas",
+    "category": "General",
+    "sub": [
+      "divulgación",
+      "interdisciplinar"
+    ]
+  }
 ]

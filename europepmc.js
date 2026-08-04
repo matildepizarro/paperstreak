@@ -35,14 +35,31 @@ const EuropePMC = {
   },
 
   async searchByTopic(topic, pageSize = 15) {
-    const terms = [topic.label, ...(topic.sub || [])].map(t => `"${t}"`).join(" OR ");
+    // Precisión: buscamos el tema y sus subtemas en TITLE o ABSTRACT (no en
+    // el texto completo), lo que evita falsos positivos por menciones de
+    // paso en cualquier parte del artículo.
+    const terms = [topic.label, ...(topic.sub || [])]
+      .map(t => `TITLE:"${t}" OR ABSTRACT:"${t}"`)
+      .join(" OR ");
     const query = `(${terms}) AND OPEN_ACCESS:Y AND IN_EPMC:Y AND (FIRST_PDATE:[${this.dateFrom()} TO ${this.dateTo()}])`;
     const url = `${this.BASE}/search?query=${encodeURIComponent(query)}&format=json&resultType=core&pageSize=${pageSize}&sort=CITED%20desc`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Europe PMC respondió ${res.status}`);
     const data = await res.json();
     const results = (data.resultList && data.resultList.result) || [];
-    return results.map(r => this.normalize(r, topic.id)).filter(Boolean);
+    return results
+      .map(r => this.normalize(r, topic.id))
+      .filter(Boolean)
+      .filter(p => this.isRelevant(p, topic));
+  },
+
+  /* Segundo filtro de precisión en el cliente: exige que el título o el
+     resumen contengan realmente el tema o alguno de sus subtemas, en vez
+     de confiar únicamente en el ranking del buscador. */
+  isRelevant(paper, topic) {
+    const haystack = `${paper.title} ${paper.abstract}`.toLowerCase();
+    const needles = [topic.label, ...(topic.sub || [])].map(t => t.toLowerCase());
+    return needles.some(n => haystack.includes(n));
   },
 
   dateFrom() {
@@ -67,6 +84,7 @@ const EuropePMC = {
 
     return {
       id: `${r.source}-${r.id}`,
+      provider: "europepmc",
       source: r.source,
       sourceId: r.id,
       pmcid,

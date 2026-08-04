@@ -15,6 +15,10 @@ const ACHIEVEMENTS = [
   { id: "xp1000", name: "1000 XP", emoji: "⭐", check: s => s.xp >= 1000 },
   { id: "weeks4", name: "4 semanas activas", emoji: "🗓️", check: s => (s.weeklyHistory || []).filter(w => w.count > 0).length >= 4 },
   { id: "perfectweek", name: "Semana perfecta", emoji: "🏆", check: s => (s.weeklyHistory || []).some(w => w.count >= 7) },
+  { id: "game-first-win", name: "Primer paper adivinado", emoji: "🧩", check: s => (s.gamesWon || 0) >= 1 },
+  { id: "game-streak3", name: "3 días de juego seguidos", emoji: "🎯", check: s => (s.gameStreak || 0) >= 3 },
+  { id: "game-streak7", name: "7 días de juego seguidos", emoji: "🎯", check: s => (s.gameStreak || 0) >= 7 },
+  { id: "game-master", name: "10 papers adivinados", emoji: "🕵️", check: s => (s.gamesWon || 0) >= 10 },
 ];
 
 /* ---------------------------------------------------------
@@ -36,14 +40,17 @@ const Store = {
       },
       readingFormat: { dailyMinutes: 10, depth: "resumen extendido", lengthPreference: "mediano" },
       feedStyle: "destacado",
+      sources: { europepmc: true, arxiv: true, semanticscholar: true },
       stats: {
         xp: 0, level: 1, currentStreak: 0, maxStreak: 0,
         papersRead: [], papersSaved: [], papersSeen: [], papersPostponed: [],
         topicMastery: {}, weeklyHistory: [], achievements: [], lastAccessDate: null,
         notes: {}, quizResults: {},
+        gameStreak: 0, maxGameStreak: 0, gamesWon: 0, gamesPlayed: 0,
       },
       settings: { theme: "light" },
       currentFeed: null, // { date, mainId, altIds }
+      game: null, // { date, paperId, guesses, solved, finishedAt } — ver game.js
     };
   },
   load() {
@@ -144,10 +151,17 @@ const RecommendationEngine = {
     const ageMonths = monthsSincePublication(paper.year);
     if (ageMonths > 18) return { score: -1, breakdown: {} };
 
-    // Afinidad temática: proporción de temas del paper que coinciden con intereses
+    // Afinidad temática: combina (a) si el tema del paper está entre los
+    // intereses del usuario y (b) qué tan "puro" es el paper en ese tema,
+    // midiendo cuántos de los subtemas reales aparecen en título/resumen.
+    // Esto evita premiar por igual un paper tangencial y uno muy enfocado.
     const mainTopics = new Set(interests.mainTopics || []);
     const overlap = paper.topics.filter(t => mainTopics.has(t)).length;
-    const affinity = mainTopics.size > 0 ? Math.min(1, overlap / Math.max(1, Math.min(paper.topics.length, 2))) : 0.4;
+    const topicMatch = mainTopics.size > 0 ? Math.min(1, overlap / Math.max(1, Math.min(paper.topics.length, 2))) : 0.4;
+
+    const topicDef = (TOPICS || []).find(t => t.id === paper.topics[0]);
+    const keywordPurity = this.topicKeywordPurity(paper, topicDef, profile);
+    const affinity = Math.min(1, (topicMatch * 0.7) + (keywordPurity * 0.3));
 
     // Recencia: usa recencyScore del mock + antigüedad real
     const recencyFromAge = Math.max(0, 1 - ageMonths / 18);
@@ -197,6 +211,20 @@ const RecommendationEngine = {
     };
   },
 
+  /* Fracción de las palabras clave del tema que realmente aparecen en el
+     título o el resumen del paper. Si el usuario marcó subáreas específicas
+     para este tema, se usan esas (más exigente y más preciso); si no, se
+     usa el tema completo con todos sus subtemas. */
+  topicKeywordPurity(paper, topicDef, profile) {
+    if (!topicDef) return 0.5;
+    const haystack = `${paper.title} ${paper.abstract}`.toLowerCase();
+    const picked = subTopicsForTopic(profile.interests.subTopics, topicDef.id);
+    const keywords = (picked.length ? [topicDef.label, ...picked] : [topicDef.label, ...(topicDef.sub || [])]).map(k => k.toLowerCase());
+    if (keywords.length === 0) return 0.5;
+    const hits = keywords.filter(k => haystack.includes(k)).length;
+    return hits / keywords.length;
+  },
+
   buildDailyFeed(papers, profile) {
     const scored = papers
       .map(p => ({ paper: p, ...this.scorePaper(p, profile) }))
@@ -223,6 +251,102 @@ const RecommendationEngine = {
     return "Este paper fue elegido porque " + parts.slice(0, 3).join(", ") + ".";
   },
 };
+
+/* ---------------------------------------------------------
+   Selector de temas (buscable y agrupado por categoría)
+   Con 100+ temas disponibles, una grilla plana de chips es
+   inmanejable, así que agrupamos por categoría y agregamos
+   un buscador que filtra en vivo.
+   --------------------------------------------------------- */
+function renderTopicPicker(containerId, selectedIds) {
+  const categories = {};
+  TOPICS.forEach(t => {
+    const cat = t.category || "Otras";
+    (categories[cat] = categories[cat] || []).push(t);
+  });
+  const groupsHtml = Object.keys(categories).sort().map(cat => `
+    <div class="topic-group" data-group>
+      <div class="topic-group-title">${cat}</div>
+      <div class="chip-grid">
+        ${categories[cat].map(t => `
+          <button type="button" class="chip ${selectedIds.includes(t.id) ? "selected" : ""}"
+            data-topic="${t.id}" data-search="${(t.label + " " + (t.sub || []).join(" ")).toLowerCase()}">
+            ${t.label}
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `).join("");
+
+  return `
+    <div class="topic-picker" id="${containerId}">
+      <input type="search" class="topic-picker-search" placeholder="Buscar tema (ej. cardiología, robótica, educación...)" data-topic-search>
+      <div class="topic-picker-groups">${groupsHtml}</div>
+    </div>
+  `;
+}
+
+function attachTopicPickerSearch(containerId) {
+  const root = document.getElementById(containerId);
+  if (!root) return;
+  const input = root.querySelector("[data-topic-search]");
+  if (!input) return;
+  input.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    root.querySelectorAll(".chip[data-search]").forEach(chip => {
+      chip.style.display = !q || chip.dataset.search.includes(q) ? "" : "none";
+    });
+    root.querySelectorAll("[data-group]").forEach(group => {
+      const anyVisible = Array.from(group.querySelectorAll(".chip")).some(c => c.style.display !== "none");
+      group.style.display = anyVisible ? "" : "none";
+    });
+  });
+}
+
+/* ---------------------------------------------------------
+   Selector de subáreas
+   Una vez elegidos los temas principales, dejamos afinar aún
+   más el feed marcando subáreas específicas dentro de cada
+   tema (ej. dentro de "Cardiología": arritmia, insuficiencia
+   cardíaca...). Si el usuario no marca ninguna subárea para
+   un tema, se sigue usando el tema completo sin restricción.
+   --------------------------------------------------------- */
+function subTopicKey(topicId, sub) { return `${topicId}::${sub}`; }
+function subTopicsForTopic(subTopicsArr, topicId) {
+  return (subTopicsArr || [])
+    .filter(s => s.startsWith(`${topicId}::`))
+    .map(s => s.slice(topicId.length + 2));
+}
+
+function renderSubAreaPicker(containerId, mainTopicIds, subTopicsArr) {
+  const chosen = TOPICS.filter(t => mainTopicIds.includes(t.id) && (t.sub || []).length > 0);
+  if (chosen.length === 0) {
+    return `<div class="topic-picker" id="${containerId}"><p class="subarea-empty">Elige al menos un tema principal arriba para poder afinar subáreas específicas.</p></div>`;
+  }
+  const groupsHtml = chosen.map(t => `
+    <div class="topic-group">
+      <div class="topic-group-title">${t.label}</div>
+      <div class="chip-grid">
+        ${t.sub.map(s => `
+          <button type="button" class="chip chip-sub ${subTopicsArr.includes(subTopicKey(t.id, s)) ? "selected" : ""}"
+            data-subtopic="${subTopicKey(t.id, s)}">${s}</button>
+        `).join("")}
+      </div>
+    </div>
+  `).join("");
+  return `<div class="topic-picker" id="${containerId}"><div class="topic-picker-groups">${groupsHtml}</div></div>`;
+}
+
+function attachSubAreaEvents(containerId, subTopicsArr, onChange) {
+  const root = document.getElementById(containerId);
+  if (!root) return;
+  root.querySelectorAll(".chip-sub").forEach(chip => {
+    chip.addEventListener("click", () => {
+      toggleInArray(subTopicsArr, chip.dataset.subtopic);
+      onChange();
+    });
+  });
+}
 
 function monthsSincePublication(year) {
   const now = new Date();
@@ -324,14 +448,15 @@ async function loadData() {
   await refreshCatalog();
 }
 
-// Trae papers reales y abiertos desde Europe PMC para los temas de interés
+// Trae papers reales y abiertos desde varias fuentes (Europe PMC, arXiv,
+// Semantic Scholar) para los temas de interés
 // del usuario (o los 3 primeros temas si aún no eligió ninguno).
 async function refreshCatalog() {
   const mainTopics = (PROFILE.interests && PROFILE.interests.mainTopics) || [];
   try {
-    PAPERS = await EuropePMC.buildCatalog(TOPICS, mainTopics);
+    PAPERS = await Catalog.build(TOPICS, mainTopics, PROFILE.sources, PROFILE.interests.subTopics);
   } catch (e) {
-    console.error("No se pudo cargar el catálogo de Europe PMC", e);
+    console.error("No se pudo cargar el catálogo de papers", e);
     PAPERS = [];
   }
 }
@@ -419,6 +544,8 @@ function showToast(msg) {
   setTimeout(() => el.remove(), 2600);
 }
 
+let _topbarAnimated = false;
+
 /* ---------------------------------------------------------
    Render principal
    --------------------------------------------------------- */
@@ -442,8 +569,18 @@ function render() {
     case "stats": view.innerHTML = renderStats(); break;
     case "settings": view.innerHTML = renderSettings(); attachSettingsEvents(); break;
     case "saved": view.innerHTML = renderSaved(); attachHomeEvents(); break;
+    case "game": view.innerHTML = PaperGame.render(); PaperGame.attachEvents(); break;
     default: view.innerHTML = renderHome(); attachHomeEvents();
   }
+  animateViewIn(view);
+}
+
+/* Reinicia y reproduce la animación de entrada del contenido principal
+   cada vez que cambia de ruta o se vuelve a renderizar. */
+function animateViewIn(el) {
+  el.classList.remove("view-animate");
+  void el.offsetWidth; // fuerza reflow para poder reiniciar la animación
+  el.classList.add("view-animate");
 }
 
 function renderTopbar() {
@@ -453,6 +590,7 @@ function renderTopbar() {
     <div class="brand"><span class="dot"></span> PaperStreak</div>
     <nav class="nav-tabs" aria-label="Navegación principal">
       <button data-route="home" class="${currentRoute === "home" ? "active" : ""}">Hoy</button>
+      <button data-route="game" class="${currentRoute === "game" ? "active" : ""}">🧩 Juego</button>
       <button data-route="saved" class="${currentRoute === "saved" ? "active" : ""}">Guardados</button>
       <button data-route="stats" class="${currentRoute === "stats" ? "active" : ""}">Progreso</button>
       <button data-route="settings" class="${currentRoute === "settings" ? "active" : ""}">Ajustes</button>
@@ -463,6 +601,10 @@ function renderTopbar() {
       <button class="icon-btn" id="theme-toggle" aria-label="Cambiar tema">${PROFILE.settings.theme === "light" ? "🌙" : "☀️"}</button>
     </div>
   `;
+  if (!_topbarAnimated) {
+    bar.classList.add("topbar-enter");
+    _topbarAnimated = true;
+  }
   bar.querySelectorAll("[data-route]").forEach(btn => {
     btn.addEventListener("click", () => navigate(btn.dataset.route));
   });
@@ -589,7 +731,7 @@ function renderReader() {
         <h1 class="reader-title">${paper.title}</h1>
         <div class="reader-meta">${paper.authors.join(", ")} · ${paper.journal} · ${paper.year} · ${paper.estimatedMinutes} min · ${capitalize(paper.difficulty)}</div>
         <div class="reader-meta">
-          <a href="${paper.openAccessUrl}" target="_blank" rel="noopener">Ver en Europe PMC ↗</a>
+          <a href="${paper.openAccessUrl}" target="_blank" rel="noopener">Ver en ${paper.source} ↗</a>
           ${paper.doi ? ` · <a href="https://doi.org/${paper.doi}" target="_blank" rel="noopener">DOI: ${paper.doi} ↗</a>` : ""}
         </div>
       </div>
@@ -602,7 +744,7 @@ function renderReader() {
       <details class="reader-block" open id="fulltext-block">
         <summary>Texto completo</summary>
         <div id="fulltext-content" class="fulltext-content">
-          <p class="fulltext-status">Cargando texto completo desde Europe PMC…</p>
+          <p class="fulltext-status">Cargando texto completo desde ${paper.source}…</p>
         </div>
       </details>
 
@@ -621,19 +763,19 @@ function renderReader() {
   `;
 }
 
-// Trae el texto completo real desde Europe PMC (no un resumen) y lo
-// inserta en el lector. Si Europe PMC no tiene el texto completo
+// Trae el texto completo real desde la fuente original (no un resumen) y lo
+// inserta en el lector. Si la fuente no tiene el texto completo
 // disponible para este artículo, se lo dice claramente al usuario
 // y deja el enlace directo a la fuente original.
 async function loadFullTextInto(paper) {
   const el = document.getElementById("fulltext-content");
   if (!el) return;
-  const html = await EuropePMC.fetchFullText(paper);
+  const html = await Catalog.fetchFullText(paper);
   if (html) {
     el.innerHTML = html;
   } else {
     el.innerHTML = `
-      <p class="fulltext-status">Europe PMC no tiene el texto completo indexado para este artículo (o su editor no lo distribuye vía la API).</p>
+      <p class="fulltext-status">${paper.source} no ofrece el texto completo estructurado para este artículo vía su API.</p>
       <p><a class="btn btn-secondary btn-sm" href="${paper.openAccessUrl}" target="_blank" rel="noopener">Leer el texto completo en la fuente original ↗</a></p>
     `;
   }
@@ -814,6 +956,14 @@ function renderStats() {
         <div class="stat-box"><div class="num">Nv. ${s.level}</div><div class="lbl">${s.xp} XP</div></div>
       </div>
 
+      <h3 class="section-title">🧩 Juego diario</h3>
+      <div class="stats-grid">
+        <div class="stat-box"><div class="num">${s.gameStreak || 0}</div><div class="lbl">Racha de juego</div></div>
+        <div class="stat-box"><div class="num">${s.maxGameStreak || 0}</div><div class="lbl">Mejor racha</div></div>
+        <div class="stat-box"><div class="num">${s.gamesWon || 0}</div><div class="lbl">Papers adivinados</div></div>
+        <div class="stat-box"><div class="num">${s.gamesPlayed ? Math.round((s.gamesWon || 0) / s.gamesPlayed * 100) : 0}%</div><div class="lbl">% de aciertos</div></div>
+      </div>
+
       <h3 class="section-title">Temas más frecuentes</h3>
       ${topTopics.length === 0 ? `<p style="color:var(--text-muted)">Aún no hay lecturas registradas.</p>` :
         topTopics.map(([t, c]) => `
@@ -865,8 +1015,21 @@ function renderSettings() {
 
       <div class="settings-group">
         <h3>Intereses principales</h3>
-        <div class="chip-grid" id="settings-topics">
-          ${TOPICS.map(t => `<button type="button" class="chip ${PROFILE.interests.mainTopics.includes(t.id) ? "selected" : ""}" data-topic="${t.id}">${t.label}</button>`).join("")}
+        ${renderTopicPicker("settings-topics", PROFILE.interests.mainTopics)}
+      </div>
+
+      <div class="settings-group">
+        <h3>Subáreas específicas</h3>
+        <p class="field-hint">Afina aún más tu feed marcando subáreas dentro de tus temas elegidos. Sin marcar ninguna, se usa el tema completo.</p>
+        ${renderSubAreaPicker("settings-subtopics", PROFILE.interests.mainTopics, PROFILE.interests.subTopics || [])}
+      </div>
+
+      <div class="settings-group">
+        <h3>Fuentes de papers</h3>
+        <div class="chip-grid" id="settings-sources">
+          <button type="button" class="chip ${PROFILE.sources.europepmc !== false ? "selected" : ""}" data-source="europepmc">Europe PMC</button>
+          <button type="button" class="chip ${PROFILE.sources.arxiv !== false ? "selected" : ""}" data-source="arxiv">arXiv</button>
+          <button type="button" class="chip ${PROFILE.sources.semanticscholar !== false ? "selected" : ""}" data-source="semanticscholar">Semantic Scholar</button>
         </div>
       </div>
 
@@ -890,7 +1053,7 @@ function renderSettings() {
         <h3>Datos</h3>
         <div class="settings-row"><span>Exportar mis datos</span><button class="btn btn-secondary btn-sm" id="export-btn">Exportar JSON</button></div>
         <div class="settings-row"><span>Importar datos</span><label class="btn btn-secondary btn-sm" style="cursor:pointer;">Importar<input type="file" id="import-input" accept="application/json" style="display:none;"></label></div>
-        <div class="settings-row"><span>Actualizar catálogo de papers (Europe PMC)</span><button class="btn btn-secondary btn-sm" id="refresh-catalog-btn">Actualizar ahora</button></div>
+        <div class="settings-row"><span>Actualizar catálogo de papers</span><button class="btn btn-secondary btn-sm" id="refresh-catalog-btn">Actualizar ahora</button></div>
         <div class="settings-row"><span>Cerrar sesión de Google</span><button class="btn btn-ghost btn-sm" id="logout-btn">Cerrar sesión</button></div>
         <div class="settings-row"><span>Reiniciar tour de bienvenida</span><button class="btn btn-ghost btn-sm" id="restart-onboarding">Reiniciar tour</button></div>
         <div class="settings-row"><span>Borrar todos los datos</span><button class="btn btn-ghost btn-sm" id="reset-btn" style="color:var(--accent);border-color:var(--accent);">Resetear</button></div>
@@ -900,12 +1063,33 @@ function renderSettings() {
 }
 
 function attachSettingsEvents() {
+  attachTopicPickerSearch("settings-topics");
+  attachSubAreaEvents("settings-subtopics", (PROFILE.interests.subTopics = PROFILE.interests.subTopics || []), () => {
+    persist();
+    render();
+    refreshCatalog().then(render);
+  });
   document.querySelectorAll("#settings-topics .chip").forEach(chip => {
     chip.addEventListener("click", () => {
       const id = chip.dataset.topic;
       const arr = PROFILE.interests.mainTopics;
       const idx = arr.indexOf(id);
-      if (idx >= 0) arr.splice(idx, 1); else arr.push(id);
+      if (idx >= 0) {
+        arr.splice(idx, 1);
+        // limpiamos subáreas huérfanas de un tema que ya no está elegido
+        PROFILE.interests.subTopics = (PROFILE.interests.subTopics || []).filter(s => !s.startsWith(`${id}::`));
+      } else {
+        arr.push(id);
+      }
+      persist();
+      render();
+      refreshCatalog().then(render);
+    });
+  });
+  document.querySelectorAll("#settings-sources .chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const key = chip.dataset.source;
+      PROFILE.sources[key] = !(PROFILE.sources[key] !== false);
       persist();
       render();
       refreshCatalog().then(render);
@@ -945,8 +1129,9 @@ function attachSettingsEvents() {
     reader.readAsText(file);
   });
   document.getElementById("refresh-catalog-btn").addEventListener("click", async () => {
-    showToast("Actualizando papers desde Europe PMC…");
+    showToast("Actualizando papers desde tus fuentes activas…");
     EuropePMC.clearCache();
+    Catalog.clearCache();
     await refreshCatalog();
     render();
     showToast("Catálogo actualizado");
@@ -1033,13 +1218,11 @@ const Onboarding = {
       body = `
         <h2 class="ob-step-title">¿Qué te interesa?</h2>
         <p class="ob-step-sub">Elige tus áreas principales (puedes elegir varias).</p>
-        <div class="chip-grid" id="ob-main-topics">
-          ${TOPICS.map(t => `<button type="button" class="chip ${d.interests.mainTopics.includes(t.id) ? "selected" : ""}" data-topic="${t.id}">${t.label}</button>`).join("")}
-        </div>
+        ${renderTopicPicker("ob-main-topics", d.interests.mainTopics)}
+        <div class="field-label">Subáreas específicas (opcional, afina aún más tu feed)</div>
+        ${renderSubAreaPicker("ob-subtopics", d.interests.mainTopics, d.interests.subTopics || [])}
         <div class="field-label">Temas a excluir (opcional)</div>
-        <div class="chip-grid" id="ob-excluded-topics">
-          ${TOPICS.map(t => `<button type="button" class="chip ${d.interests.excludedTopics.includes(t.id) ? "selected" : ""}" data-topic="${t.id}">${t.label}</button>`).join("")}
-        </div>
+        ${renderTopicPicker("ob-excluded-topics", d.interests.excludedTopics)}
         <div class="field-label">Idioma preferido</div>
         <div class="chip-grid" id="ob-language">
           ${[["es", "Español"], ["en", "Inglés"]].map(([v, l]) => `<button type="button" class="chip ${d.interests.language === v ? "selected" : ""}" data-lang="${v}">${l}</button>`).join("")}
@@ -1123,8 +1306,18 @@ const Onboarding = {
     const d = this.draft;
     const q = sel => this._overlay.querySelectorAll(sel);
 
+    attachTopicPickerSearch("ob-main-topics");
+    attachTopicPickerSearch("ob-excluded-topics");
+    attachSubAreaEvents("ob-subtopics", (d.interests.subTopics = d.interests.subTopics || []), () => this.refresh());
     q("#ob-main-topics .chip").forEach(c => c.addEventListener("click", () => {
-      toggleInArray(d.interests.mainTopics, c.dataset.topic); this.refresh();
+      const id = c.dataset.topic;
+      if (d.interests.mainTopics.includes(id)) {
+        toggleInArray(d.interests.mainTopics, id);
+        d.interests.subTopics = (d.interests.subTopics || []).filter(s => !s.startsWith(`${id}::`));
+      } else {
+        toggleInArray(d.interests.mainTopics, id);
+      }
+      this.refresh();
     }));
     q("#ob-excluded-topics .chip").forEach(c => c.addEventListener("click", () => {
       toggleInArray(d.interests.excludedTopics, c.dataset.topic); this.refresh();
@@ -1162,7 +1355,7 @@ const Onboarding = {
     this.unmount();
     this.reset();
     currentRoute = "home";
-    showToast("Buscando papers reales en Europe PMC…");
+    showToast("Buscando papers reales en tus fuentes activas…");
     await refreshCatalog();
     render();
     showToast("¡Bienvenido a PaperStreak! 🎉");

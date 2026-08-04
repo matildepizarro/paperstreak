@@ -20,14 +20,23 @@ usa datos de ejemplo/mock: busca papers reales y abiertos en la API pública de
 Sin este paso, la app muestra una pantalla explicando que falta configurar Firebase
 en vez de romperse silenciosamente.
 
-## Papers reales, no simulados
+## Papers reales, no simulados (varias fuentes)
 
 `data/papers.json` (el catálogo mock de 30 papers) ya no se usa para armar el feed.
-`europepmc.js` consulta la API REST pública de Europe PMC
-(`https://www.ebi.ac.uk/europepmc/webservices/rest/search`) filtrando por
-`OPEN_ACCESS:Y`, según los temas de interés elegidos en el onboarding, y guarda el
-resultado en caché local por 12 horas. Cada tarjeta enlaza a la página real del
-artículo en Europe PMC (o a su DOI), así que nunca debería llevar a una fuente
+`sources.js` combina en un único catálogo tres APIs públicas y reales, según qué
+fuentes tenga activadas el usuario en Ajustes (todas activas por defecto):
+
+- **Europe PMC** (`europepmc.js`) — ciencias de la vida, medicina, biología.
+  Filtra por `OPEN_ACCESS:Y`.
+- **arXiv** (`arxiv.js`) — preprints de IA, física, matemáticas, ingeniería.
+  Todo lo publicado ahí es de acceso abierto por diseño.
+- **Semantic Scholar** (`semanticscholar.js`) — cobertura multidisciplinaria
+  amplia. Solo se incluyen resultados con `openAccessPdf` verificado.
+
+Los resultados se deduplican por DOI cuando dos fuentes indexan el mismo
+artículo, y se cachean 12 horas en localStorage (o hasta que cambies tus temas
+o fuentes activas). Cada tarjeta enlaza a la página real del artículo en su
+fuente original (o a su DOI), así que nunca debería llevar a una fuente
 inexistente.
 
 ## Progreso sincronizado entre dispositivos (Firestore)
@@ -67,11 +76,12 @@ copia local del navegador como respaldo.
 
 El lector (`renderReader`) ya no reescribe el abstract como "resumen breve" ni
 inventa "puntos clave" o "términos difíciles". Muestra el abstract real del
-artículo y, cuando Europe PMC tiene indexado el texto completo (`fullTextXML`,
-disponible para el subconjunto de artículos PMC de acceso abierto), lo renderiza
-completo dentro de la app. Si Europe PMC no distribuye el texto completo para ese
-artículo en particular, se lo dice explícitamente al usuario y ofrece el enlace
-directo a la fuente original — nunca genera un resumen como sustituto.
+artículo y, cuando la fuente tiene indexado el texto completo (por ahora solo
+Europe PMC lo ofrece estructurado, vía `fullTextXML`, para el subconjunto PMC
+de acceso abierto), lo renderiza completo dentro de la app. arXiv y Semantic
+Scholar no exponen el cuerpo del artículo por API — para esos casos se muestra
+el abstract y un enlace directo al PDF real de la fuente. Nunca se genera un
+resumen como sustituto del texto.
 
 ## 1. Visión del producto
 

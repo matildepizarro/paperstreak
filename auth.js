@@ -64,15 +64,20 @@ const Auth = {
     PROFILE = this.mergeProfiles(local, cloud);
     Store.save(PROFILE);
 
-    document.getElementById("auth-gate")?.remove();
-    document.getElementById("app-shell").style.display = "";
+    const gate = document.getElementById("auth-gate");
+    const shell = document.getElementById("app-shell");
+    if (gate) {
+      gate.classList.add("auth-gate-exit");
+      await new Promise(resolve => setTimeout(resolve, 380));
+      gate.remove();
+    }
+    shell.style.display = "";
+    shell.classList.add("app-enter");
     await init();
 
     this.pushToCloud(PROFILE); // asegura que la nube tenga la versión fusionada
     this.startCloudListener(user.uid);
-  },
-
-  // Si hay datos en ambos lados, gana el más reciente (según updatedAt).
+  },  // Si hay datos en ambos lados, gana el más reciente (según updatedAt).
   // Si el perfil local nunca completó onboarding, se prioriza la nube
   // (típico caso: la persona ya usaba la app en otro dispositivo).
   mergeProfiles(local, cloud) {
