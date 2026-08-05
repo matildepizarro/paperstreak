@@ -1,55 +1,91 @@
 /* =========================================================
-   Auth — login real con Google (Firebase Authentication) +
-   sincronización del progreso entre dispositivos (Firestore).
-   Cada usuario de Google tiene un documento propio
-   profiles/{uid} en la nube. localStorage sigue existiendo
-   como caché rápida/offline, pero Firestore es la fuente de
-   verdad cuando hay conexión.
+   Auth — login OPCIONAL con Google (Firebase Authentication)
+   para sincronizar el progreso entre dispositivos.
+
+   IMPORTANTE (rediseño): esto ya NO bloquea la app. Antes, la
+   app entera quedaba oculta hasta que el login con Google
+   terminara con éxito — si Firebase no estaba configurado, si
+   el popup se bloqueaba, si el dominio no estaba autorizado, o
+   si simplemente no había conexión, la persona se quedaba
+   viendo una pantalla vacía sin ningún paper ni selector de
+   temas, sin ningún mensaje claro de qué pasaba.
+
+   Ahora: la app (app.js → init()) arranca sola en cuanto carga
+   la página, usando localStorage. Este archivo solo agrega un
+   botón opcional en Ajustes ("Sincronización") para conectar
+   una cuenta de Google si la persona quiere respaldar su
+   progreso o usarlo en más de un dispositivo. Si algo de esto
+   falla, la app sigue funcionando igual en modo local.
    ========================================================= */
 const Auth = {
   currentUser: null,
-  _configured: false,
+  configured: false,
   db: null,
+  status: "idle", // idle | signing-in | signed-in | error | unconfigured
+  lastError: null,
   _syncTimer: null,
   _unsubscribeCloud: null,
 
   init() {
-    this._configured = !!(window.firebase && firebaseConfig && firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith("REEMPLAZA"));
-    if (!this._configured) {
-      console.warn("Auth: falta configurar firebase-config.js con las credenciales reales de tu proyecto Firebase.");
-      this.renderConfigMissing();
+    this.configured = !!(
+      window.firebase && typeof firebaseConfig !== "undefined" &&
+      firebaseConfig && firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith("REEMPLAZA")
+    );
+    if (!this.configured) {
+      this.status = "unconfigured";
+      console.info("Auth: sincronización con Google no configurada (firebase-config.js). La app funciona igual en modo local.");
       return;
     }
-    firebase.initializeApp(firebaseConfig);
-    this.db = firebase.firestore();
-    firebase.auth().onAuthStateChanged(user => {
-      this.currentUser = user;
-      if (user) {
-        this.onSignedIn(user);
-      } else {
-        if (this._unsubscribeCloud) { this._unsubscribeCloud(); this._unsubscribeCloud = null; }
-        this.renderLoginScreen();
-      }
-    });
+    try {
+      firebase.initializeApp(firebaseConfig);
+      this.db = firebase.firestore();
+      firebase.auth().onAuthStateChanged(user => {
+        this.currentUser = user;
+        if (user) {
+          this.status = "signed-in";
+          this.onSignedIn(user);
+        } else {
+          this.status = "idle";
+          if (this._unsubscribeCloud) { this._unsubscribeCloud(); this._unsubscribeCloud = null; }
+          if (typeof render === "function") render();
+        }
+      });
+    } catch (err) {
+      // Si el SDK de Firebase no llegó a cargar (bloqueado por la red, sin
+      // internet al momento de cargar la página, etc.) no rompemos nada:
+      // seguimos en modo local.
+      this.status = "error";
+      this.lastError = err;
+      console.warn("Auth: no se pudo inicializar Firebase, la app sigue en modo local.", err);
+    }
   },
 
   async signInWithGoogle() {
+    if (!this.configured) return;
+    this.status = "signing-in";
+    this.lastError = null;
+    if (typeof render === "function") render();
     const provider = new firebase.auth.GoogleAuthProvider();
     try {
       await firebase.auth().signInWithPopup(provider);
     } catch (err) {
       console.error("Error de login con Google", err);
-      const box = document.getElementById("auth-error");
-      if (box) box.textContent = "No se pudo iniciar sesión: " + (err.message || err.code || "error desconocido");
+      this.status = "error";
+      this.lastError = err.message || err.code || "No se pudo iniciar sesión.";
+      if (typeof render === "function") render();
     }
   },
 
   signOut() {
-    firebase.auth().signOut();
+    if (this.db && this._unsubscribeCloud) { this._unsubscribeCloud(); this._unsubscribeCloud = null; }
+    if (window.firebase && firebase.auth) firebase.auth().signOut();
+    this.status = "idle";
   },
 
   async onSignedIn(user) {
-    // Namespacea el storage local por usuario (caché offline).
+    // Namespacea el storage local por usuario (caché offline) y fusiona
+    // con lo que haya en la nube, sin perder progreso local si la nube
+    // está vacía o desactualizada.
     STORAGE_KEY = `paperstreak:profile:v1:${user.uid}`;
     const local = Store.load();
 
@@ -58,26 +94,19 @@ const Auth = {
       const doc = await this.db.collection("profiles").doc(user.uid).get();
       if (doc.exists) cloud = doc.data();
     } catch (e) {
-      console.warn("No se pudo leer el progreso en la nube (¿sin conexión?). Se usa la copia local.", e);
+      console.warn("No se pudo leer el progreso en la nube (¿sin conexión?). Se sigue usando la copia local.", e);
     }
 
-    PROFILE = this.mergeProfiles(local, cloud);
+    const merged = this.mergeProfiles(local, cloud);
+    PROFILE = Object.assign(Store.defaultProfile(), merged);
     Store.save(PROFILE);
 
-    const gate = document.getElementById("auth-gate");
-    const shell = document.getElementById("app-shell");
-    if (gate) {
-      gate.classList.add("auth-gate-exit");
-      await new Promise(resolve => setTimeout(resolve, 380));
-      gate.remove();
-    }
-    shell.style.display = "";
-    shell.classList.add("app-enter");
-    await init();
-
+    if (typeof render === "function") render();
     this.pushToCloud(PROFILE); // asegura que la nube tenga la versión fusionada
     this.startCloudListener(user.uid);
-  },  // Si hay datos en ambos lados, gana el más reciente (según updatedAt).
+  },
+
+  // Si hay datos en ambos lados, gana el más reciente (según updatedAt).
   // Si el perfil local nunca completó onboarding, se prioriza la nube
   // (típico caso: la persona ya usaba la app en otro dispositivo).
   mergeProfiles(local, cloud) {
@@ -120,41 +149,43 @@ const Auth = {
     }
   },
 
-  renderLoginScreen() {
-    document.getElementById("app-shell").style.display = "none";
-    let gate = document.getElementById("auth-gate");
-    if (!gate) {
-      gate = document.createElement("div");
-      gate.id = "auth-gate";
-      document.body.appendChild(gate);
+  // Pequeño bloque para Ajustes — reemplaza a la antigua pantalla completa
+  // que tapaba toda la app. Se usa desde renderSettings() en app.js.
+  renderSettingsBlock() {
+    if (!this.configured) {
+      return `
+        <div class="settings-group">
+          <h3>Sincronización</h3>
+          <p class="field-hint">No configurada. Tu progreso se guarda igual en este dispositivo (localStorage).</p>
+        </div>
+      `;
     }
-    gate.innerHTML = `
-      <div class="auth-card">
-        <div class="brand"><span class="dot"></span> PaperStreak</div>
-        <p>Inicia sesión con tu cuenta de Google para guardar tu racha, tu XP y tus notas, sincronizados en todos tus dispositivos.</p>
-        <button class="btn btn-primary" id="google-signin-btn">Continuar con Google</button>
-        <p id="auth-error" class="auth-error"></p>
+    if (this.status === "signed-in" && this.currentUser) {
+      return `
+        <div class="settings-group">
+          <h3>Sincronización</h3>
+          <p class="field-hint">Conectado como ${this.currentUser.email || this.currentUser.displayName || "usuario de Google"}. Tu progreso se respalda automáticamente.</p>
+          <button class="btn" id="auth-signout-btn">Cerrar sesión</button>
+        </div>
+      `;
+    }
+    const errorHtml = this.lastError ? `<p class="auth-error">${this.lastError}</p>` : "";
+    return `
+      <div class="settings-group">
+        <h3>Sincronización</h3>
+        <p class="field-hint">Tu progreso ya se guarda en este dispositivo. Conecta Google si quieres respaldarlo o usarlo en más de un dispositivo (opcional).</p>
+        <button class="btn btn-primary" id="auth-signin-btn" ${this.status === "signing-in" ? "disabled" : ""}>
+          ${this.status === "signing-in" ? "Conectando…" : "Conectar con Google"}
+        </button>
+        ${errorHtml}
       </div>
     `;
-    document.getElementById("google-signin-btn").addEventListener("click", () => this.signInWithGoogle());
   },
-
-  renderConfigMissing() {
-    document.getElementById("app-shell").style.display = "none";
-    let gate = document.getElementById("auth-gate");
-    if (!gate) {
-      gate = document.createElement("div");
-      gate.id = "auth-gate";
-      document.body.appendChild(gate);
-    }
-    gate.innerHTML = `
-      <div class="auth-card">
-        <div class="brand"><span class="dot"></span> PaperStreak</div>
-        <p><strong>El login con Google todavía no está configurado.</strong></p>
-        <p>Edita <code>firebase-config.js</code> con las credenciales de tu propio proyecto de Firebase
-        (Authentication → Sign-in method → Google) y recarga la página.</p>
-      </div>
-    `;
+  attachSettingsEvents() {
+    const signIn = document.getElementById("auth-signin-btn");
+    if (signIn) signIn.addEventListener("click", () => this.signInWithGoogle());
+    const signOut = document.getElementById("auth-signout-btn");
+    if (signOut) signOut.addEventListener("click", () => this.signOut());
   },
 };
 

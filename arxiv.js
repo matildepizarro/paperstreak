@@ -31,7 +31,7 @@ const ArXivSource = {
       const q = attempts[i]();
       try {
         const url = `${this.BASE}?search_query=${encodeURIComponent(q)}&start=0&max_results=${maxResults * 2}&sortBy=submittedDate&sortOrder=descending`;
-        const res = await fetchWithTimeout(url);
+        const res = await fetch(url);
         if (!res.ok) throw new Error(`arXiv respondió ${res.status}`);
         const xmlText = await res.text();
         const doc = new DOMParser().parseFromString(xmlText, "text/xml");

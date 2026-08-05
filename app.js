@@ -140,10 +140,6 @@ const RecommendationEngine = {
   },
 
   scorePaper(paper, profile, opts = {}) {
-    // Defensivo: si algún paper llega con datos incompletos (fuente externa
-    // con un esquema inesperado), no debe romper todo el scoring del resto
-    // del catálogo — simplemente se lo trata como sin temas asociados.
-    if (!paper || !Array.isArray(paper.topics)) return { score: -1, breakdown: {} };
     const interests = profile.interests;
     const seen = new Set(profile.stats.papersSeen || []);
     const read = new Set(profile.stats.papersRead || []);
@@ -286,10 +282,13 @@ const RecommendationEngine = {
 };
 
 /* ---------------------------------------------------------
-   Selector de temas (buscable y agrupado por categoría)
-   Con 100+ temas disponibles, una grilla plana de chips es
-   inmanejable, así que agrupamos por categoría y agregamos
-   un buscador que filtra en vivo.
+   Selector de temas — v2 simplificado
+   Con 100+ temas, mostrar todo desplegado a la vez es
+   inmanejable. Usamos <details>/<summary> nativos del
+   navegador: cada categoría se puede plegar/desplegar sin
+   escribir JS para eso (menos código, menos bugs). Solo se
+   abren automáticamente las categorías que ya tienen algo
+   seleccionado, o las que calzan con una búsqueda activa.
    --------------------------------------------------------- */
 function renderTopicPicker(containerId, selectedIds) {
   const categories = {};
@@ -298,19 +297,18 @@ function renderTopicPicker(containerId, selectedIds) {
     (categories[cat] = categories[cat] || []).push(t);
   });
   const catNames = Object.keys(categories).sort();
+
   const groupsHtml = catNames.map(cat => {
-    const items = categories[cat];
-    const selectedInGroup = items.filter(t => selectedIds.includes(t.id)).length;
+    const topicsInCat = categories[cat];
+    const selectedCount = topicsInCat.filter(t => selectedIds.includes(t.id)).length;
     return `
-    <details class="topic-group" data-group data-initial-open="${selectedInGroup > 0}" ${selectedInGroup > 0 ? "open" : ""}>
+    <details class="topic-group" data-group ${selectedCount > 0 ? "open" : ""}>
       <summary class="topic-group-title">
-        <span class="topic-group-chevron">▸</span>
-        <span class="topic-group-name">${cat}</span>
-        <span class="topic-group-total">${items.length}</span>
-        ${selectedInGroup > 0 ? `<span class="group-count">${selectedInGroup}</span>` : ""}
+        <span>${cat}</span>
+        <span class="topic-group-count" ${selectedCount === 0 ? 'hidden' : ""}>${selectedCount}</span>
       </summary>
       <div class="chip-grid">
-        ${items.map(t => `
+        ${topicsInCat.map(t => `
           <button type="button" class="chip ${selectedIds.includes(t.id) ? "selected" : ""}"
             data-topic="${t.id}" data-search="${(t.label + " " + (t.sub || []).join(" ")).toLowerCase()}">
             ${t.label}
@@ -321,25 +319,11 @@ function renderTopicPicker(containerId, selectedIds) {
   `;
   }).join("");
 
-  const selectedLabels = selectedIds
-    .map(id => (TOPICS.find(t => t.id === id) || {}).label)
-    .filter(Boolean);
-
   return `
     <div class="topic-picker" id="${containerId}">
-      <div class="topic-picker-toolbar">
-        <div class="topic-picker-searchwrap">
-          <span class="topic-picker-search-icon" aria-hidden="true">🔍</span>
-          <input type="search" class="topic-picker-search" placeholder="Buscar tema..." data-topic-search>
-        </div>
-        <span class="topic-picker-selected-count">${selectedIds.length ? `${selectedIds.length} elegido${selectedIds.length === 1 ? "" : "s"}` : "Ninguno elegido"}</span>
-      </div>
-      ${selectedLabels.length ? `
-        <div class="topic-picker-selected-row">
-          ${selectedLabels.map(l => `<span class="mini-chip">${l}</span>`).join("")}
-        </div>
-      ` : ""}
-      <div class="topic-picker-groups" data-topic-empty-hint="No se encontraron temas para esa búsqueda.">${groupsHtml}</div>
+      <input type="search" class="topic-picker-search" placeholder="Buscar tema (ej. cardiología, robótica, educación...)" data-topic-search>
+      <div class="topic-picker-summary" data-topic-summary>${selectedIds.length} tema${selectedIds.length === 1 ? "" : "s"} seleccionado${selectedIds.length === 1 ? "" : "s"}</div>
+      <div class="topic-picker-groups">${groupsHtml}</div>
     </div>
   `;
 }
@@ -351,19 +335,36 @@ function attachTopicPickerSearch(containerId) {
   if (!input) return;
   input.addEventListener("input", () => {
     const q = input.value.trim().toLowerCase();
-    let anyGroupVisible = false;
     root.querySelectorAll("[data-group]").forEach(group => {
-      const anyVisible = !q || Array.from(group.querySelectorAll(".chip")).some(c => {
-        const match = c.dataset.search.includes(q);
-        c.style.display = match ? "" : "none";
-        return match;
-      });
-      if (!q) group.querySelectorAll(".chip").forEach(c => (c.style.display = ""));
-      group.style.display = anyVisible ? "" : "none";
-      group.open = q ? anyVisible : group.dataset.initialOpen === "true";
-      if (anyVisible) anyGroupVisible = true;
+      const chips = Array.from(group.querySelectorAll(".chip"));
+      const anyMatch = chips.some(c => !q || c.dataset.search.includes(q));
+      chips.forEach(c => { c.style.display = !q || c.dataset.search.includes(q) ? "" : "none"; });
+      group.style.display = anyMatch ? "" : "none";
+      // Mientras se busca, abrimos las categorías con coincidencias para
+      // que el usuario no tenga que desplegarlas manualmente.
+      if (q && anyMatch) group.setAttribute("open", "");
     });
-    root.querySelector(".topic-picker-groups").classList.toggle("is-empty", q && !anyGroupVisible);
+  });
+}
+
+/* Actualiza el contador "N temas seleccionados" y el badge por categoría
+   sin volver a construir todo el HTML (evita perder el estado de scroll
+   y de categorías abiertas mientras el usuario hace clic). */
+function refreshTopicPickerCounts(containerId, selectedIds) {
+  const root = document.getElementById(containerId);
+  if (!root) return;
+  const summary = root.querySelector("[data-topic-summary]");
+  if (summary) {
+    summary.textContent = `${selectedIds.length} tema${selectedIds.length === 1 ? "" : "s"} seleccionado${selectedIds.length === 1 ? "" : "s"}`;
+  }
+  root.querySelectorAll("[data-group]").forEach(group => {
+    const count = Array.from(group.querySelectorAll(".chip[data-topic]"))
+      .filter(c => selectedIds.includes(c.dataset.topic)).length;
+    const badge = group.querySelector(".topic-group-count");
+    if (badge) {
+      badge.textContent = String(count);
+      badge.hidden = count === 0;
+    }
   });
 }
 
@@ -515,6 +516,19 @@ async function loadData() {
 // Trae papers reales y abiertos desde varias fuentes (Europe PMC, arXiv,
 // Semantic Scholar) para los temas de interés
 // del usuario (o los 3 primeros temas si aún no eligió ninguno).
+let _catalogRefreshTimer = null;
+/* Evita disparar una recarga del catálogo (que hace fetch a APIs externas)
+   por cada clic individual al elegir varios temas seguidos. Espera un
+   momento de calma y recién ahí busca, mostrando un aviso mientras tanto. */
+function debouncedRefreshCatalog(delayMs = 700) {
+  CATALOG_LOADING = true;
+  clearTimeout(_catalogRefreshTimer);
+  _catalogRefreshTimer = setTimeout(() => {
+    refreshCatalog().then(() => { CATALOG_LOADING = false; render(); });
+  }, delayMs);
+}
+let CATALOG_LOADING = false;
+
 async function refreshCatalog() {
   const mainTopics = (PROFILE.interests && PROFILE.interests.mainTopics) || [];
   try {
@@ -683,9 +697,13 @@ function renderTopbar() {
 function renderHome() {
   const feed = ensureDailyFeed();
   if (!feed.mainId) {
+    // Este mensaje ya no debería aparecer nunca en uso normal: Catalog
+    // siempre devuelve al menos el set de respaldo local si todo lo demás
+    // falla. Si de todos modos lo ves, TOPICS o PAPERS no llegaron a
+        // cargarse (revisa la consola del navegador con F12).
     return `<div class="container"><div class="empty-state">
-      <h2>No encontramos papers dentro de tus criterios actuales</h2>
-      <p>Prueba ajustando tus intereses o excluidos en Ajustes.</p>
+      <h2>Cargando tu paper de hoy…</h2>
+      <p>Si este mensaje no desaparece en unos segundos, revisa la consola del navegador (F12) y cuéntame qué error aparece.</p>
       <button class="btn btn-primary" onclick="navigate('settings')">Ir a ajustes</button>
     </div></div>`;
   }
@@ -697,12 +715,21 @@ function renderHome() {
 
   const alts = feed.altIds.map(id => paperById(id)).filter(Boolean);
 
+  const offlineNotice = (typeof Catalog !== "undefined" && Catalog.lastUsedOfflineFallback)
+    ? `<div class="offline-banner">📡 No pudimos conectar con las bases de datos de papers en este momento, así que estás viendo un ejemplo verificado guardado en la app. Se actualizará solo cuando vuelva la conexión.</div>`
+    : "";
+  const loadingNotice = (typeof CATALOG_LOADING !== "undefined" && CATALOG_LOADING)
+    ? `<div class="offline-banner">🔎 Buscando papers para tus temas nuevos…</div>`
+    : "";
+
   return `
     <div class="container">
       <div class="hero-header">
         <h1>Tu paper de hoy</h1>
         <p>${new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })} · meta diaria: ${PROFILE.readingFormat.dailyMinutes} min</p>
       </div>
+      ${loadingNotice}
+      ${offlineNotice}
 
       <article class="paper-card featured">
         <span class="paper-badge">${main.featuredFlag ? "Destacado" : "Recomendado"}</span>
@@ -1082,6 +1109,8 @@ function renderSettings() {
         ${renderTopicPicker("settings-topics", PROFILE.interests.mainTopics)}
       </div>
 
+      ${typeof Auth !== "undefined" ? Auth.renderSettingsBlock() : ""}
+
       <div class="settings-group">
         <h3>Subáreas específicas</h3>
         <p class="field-hint">Afina aún más tu feed marcando subáreas dentro de tus temas elegidos. Sin marcar ninguna, se usa el tema completo.</p>
@@ -1127,17 +1156,18 @@ function renderSettings() {
 }
 
 function attachSettingsEvents() {
+  if (typeof Auth !== "undefined") Auth.attachSettingsEvents();
   attachTopicPickerSearch("settings-topics");
   attachSubAreaEvents("settings-subtopics", (PROFILE.interests.subTopics = PROFILE.interests.subTopics || []), () => {
     persist();
-    render();
-    refreshCatalog().then(render);
+    debouncedRefreshCatalog();
   });
   document.querySelectorAll("#settings-topics .chip").forEach(chip => {
     chip.addEventListener("click", () => {
       const id = chip.dataset.topic;
       const arr = PROFILE.interests.mainTopics;
       const idx = arr.indexOf(id);
+      const nowSelected = idx < 0;
       if (idx >= 0) {
         arr.splice(idx, 1);
         // limpiamos subáreas huérfanas de un tema que ya no está elegido
@@ -1145,9 +1175,15 @@ function attachSettingsEvents() {
       } else {
         arr.push(id);
       }
+      chip.classList.toggle("selected", nowSelected);
+      refreshTopicPickerCounts("settings-topics", arr);
+      const subtopicsRoot = document.getElementById("settings-subtopics");
+      if (subtopicsRoot) {
+        subtopicsRoot.outerHTML = renderSubAreaPicker("settings-subtopics", arr, PROFILE.interests.subTopics || []);
+        attachSubAreaEvents("settings-subtopics", PROFILE.interests.subTopics, () => { persist(); debouncedRefreshCatalog(); });
+      }
       persist();
-      render();
-      refreshCatalog().then(render);
+      debouncedRefreshCatalog();
     });
   });
   document.querySelectorAll("#settings-sources .chip").forEach(chip => {
@@ -1373,18 +1409,32 @@ const Onboarding = {
     attachTopicPickerSearch("ob-main-topics");
     attachTopicPickerSearch("ob-excluded-topics");
     attachSubAreaEvents("ob-subtopics", (d.interests.subTopics = d.interests.subTopics || []), () => this.refresh());
+    // Nota: los clics en chips de temas NO hacen this.refresh() completo.
+    // Un refresh completo reconstruye todo el HTML del paso y eso colapsa
+    // cualquier categoría <details> que el usuario haya abierto a mano sin
+    // haber seleccionado nada todavía. En vez de eso, togglamos la clase
+    // en el propio botón y solo actualizamos los contadores + la sección
+    // de subáreas (que sí depende de qué temas principales están activos).
     q("#ob-main-topics .chip").forEach(c => c.addEventListener("click", () => {
       const id = c.dataset.topic;
-      if (d.interests.mainTopics.includes(id)) {
-        toggleInArray(d.interests.mainTopics, id);
+      const wasSelected = d.interests.mainTopics.includes(id);
+      toggleInArray(d.interests.mainTopics, id);
+      c.classList.toggle("selected", !wasSelected);
+      if (wasSelected) {
         d.interests.subTopics = (d.interests.subTopics || []).filter(s => !s.startsWith(`${id}::`));
-      } else {
-        toggleInArray(d.interests.mainTopics, id);
       }
-      this.refresh();
+      refreshTopicPickerCounts("ob-main-topics", d.interests.mainTopics);
+      const subtopicsRoot = document.getElementById("ob-subtopics");
+      if (subtopicsRoot) {
+        subtopicsRoot.outerHTML = renderSubAreaPicker("ob-subtopics", d.interests.mainTopics, d.interests.subTopics || []);
+        attachSubAreaEvents("ob-subtopics", d.interests.subTopics, () => this.refresh());
+      }
     }));
     q("#ob-excluded-topics .chip").forEach(c => c.addEventListener("click", () => {
-      toggleInArray(d.interests.excludedTopics, c.dataset.topic); this.refresh();
+      const id = c.dataset.topic;
+      toggleInArray(d.interests.excludedTopics, id);
+      c.classList.toggle("selected");
+      refreshTopicPickerCounts("ob-excluded-topics", d.interests.excludedTopics);
     }));
     q("#ob-language .chip").forEach(c => c.addEventListener("click", () => {
       d.interests.language = c.dataset.lang; this.refresh();
@@ -1451,5 +1501,14 @@ async function init() {
 }
 
 window.navigate = navigate;
-// init() ya no se llama aquí: lo dispara auth.js una vez que el usuario
-// inicia sesión con Google (ver onSignedIn en auth.js).
+// La app arranca directamente al cargar la página, sin esperar ningún login.
+// Antes, init() solo se llamaba desde auth.js tras un inicio de sesión con
+// Google exitoso — si ese login fallaba por cualquier motivo (Firebase no
+// configurado, popup bloqueado, dominio no autorizado, sin conexión, etc.),
+// TODA la app quedaba oculta detrás de esa pantalla, incluyendo el selector
+// de temas y los papers. Ahora el login es un extra opcional para
+// sincronizar entre dispositivos (ver Ajustes → Sincronización), no un
+// requisito para que la app funcione.
+document.addEventListener("DOMContentLoaded", () => {
+  init();
+});
